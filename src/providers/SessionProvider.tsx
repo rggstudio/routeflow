@@ -235,34 +235,40 @@ export function SessionProvider({ children }: SessionProviderProps) {
         }
 
         const callbackUrl = new URL(result.url);
-
-        // Supabase may return params in the query string or hash fragment
+        const queryParams = callbackUrl.searchParams;
         const hashParams = new URLSearchParams(callbackUrl.hash.replace(/^#/, ''));
-        const authCode =
-          callbackUrl.searchParams.get('code') ?? hashParams.get('code');
+
         const authError =
-          callbackUrl.searchParams.get('error_description') ??
-          callbackUrl.searchParams.get('error') ??
+          queryParams.get('error_description') ??
+          queryParams.get('error') ??
           hashParams.get('error_description') ??
           hashParams.get('error');
-
-        console.log('[auth] callback url:', result.url);
-        console.log('[auth] authCode present:', Boolean(authCode));
-        console.log('[auth] authError:', authError);
 
         if (authError) {
           throw new Error(authError);
         }
 
-        if (!authCode) {
-          throw new Error('No authorization code was returned from the provider.');
+        // PKCE flow: exchange code for session
+        const authCode = queryParams.get('code') ?? hashParams.get('code');
+        if (authCode) {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(authCode);
+          if (exchangeError) throw exchangeError;
+          return;
         }
 
-        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(authCode);
-
-        if (exchangeError) {
-          throw exchangeError;
+        // Implicit flow: tokens returned directly in hash
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        if (accessToken && refreshToken) {
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (sessionError) throw sessionError;
+          return;
         }
+
+        throw new Error('No authorization code or token was returned from the provider.');
       },
       signUp: async (email, password) => {
         if (!supabase) {
