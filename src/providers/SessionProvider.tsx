@@ -210,6 +210,8 @@ export function SessionProvider({ children }: SessionProviderProps) {
           path: 'auth/callback',
         });
 
+        console.log('[auth] redirectTo:', redirectTo);
+
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider,
           options: {
