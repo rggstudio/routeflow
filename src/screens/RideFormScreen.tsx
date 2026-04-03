@@ -151,10 +151,16 @@ export function RideFormScreen({ navigation, route }: Props) {
 
       navigation.goBack();
     } catch (error) {
-      Alert.alert(
-        'Missing details',
-        error instanceof Error ? error.message : 'Check the ride form.'
-      );
+      const message =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'object' && error !== null && 'message' in error
+            ? String((error as { message: unknown }).message)
+            : 'Something went wrong. Please try again.';
+      const isValidationError =
+        error instanceof Error &&
+        (message.includes('required') || message.includes('Choose'));
+      Alert.alert(isValidationError ? 'Missing details' : 'Could not save ride', message);
     } finally {
       setIsSubmitting(false);
     }
@@ -201,6 +207,42 @@ export function RideFormScreen({ navigation, route }: Props) {
               />
             ))}
           </View>
+        </SectionCard>
+
+        <SectionCard title="Recurrence">
+          <View className="mb-4 flex-row flex-wrap gap-2">
+            {recurrenceModes.map((mode) => (
+              <PillButton
+                key={mode.value}
+                label={mode.label}
+                selected={draft.recurrenceType === mode.value}
+                onPress={() => setField('recurrenceType', mode.value)}
+              />
+            ))}
+          </View>
+
+          {draft.recurrenceType === 'custom' ? (
+            <View className="flex-row flex-wrap gap-2">
+              {Array.from({ length: 7 }, (_, index) => index + 1).map((day) => {
+                const selected = draft.recurrenceDays.includes(day);
+                return (
+                  <PillButton
+                    key={day}
+                    label={weekdayIndexToLabel(day)}
+                    selected={selected}
+                    onPress={() =>
+                      setField(
+                        'recurrenceDays',
+                        selected
+                          ? draft.recurrenceDays.filter((value) => value !== day)
+                          : [...draft.recurrenceDays, day]
+                      )
+                    }
+                  />
+                );
+              })}
+            </View>
+          ) : null}
         </SectionCard>
 
         <SectionCard title="Trip details">
@@ -253,42 +295,6 @@ export function RideFormScreen({ navigation, route }: Props) {
             onChangeText={(value) => setField('payAmount', value)}
             placeholder="0.00"
           />
-        </SectionCard>
-
-        <SectionCard title="Recurrence">
-          <View className="mb-4 flex-row flex-wrap gap-2">
-            {recurrenceModes.map((mode) => (
-              <PillButton
-                key={mode.value}
-                label={mode.label}
-                selected={draft.recurrenceType === mode.value}
-                onPress={() => setField('recurrenceType', mode.value)}
-              />
-            ))}
-          </View>
-
-          {draft.recurrenceType === 'custom' ? (
-            <View className="flex-row flex-wrap gap-2">
-              {Array.from({ length: 7 }, (_, index) => index + 1).map((day) => {
-                const selected = draft.recurrenceDays.includes(day);
-                return (
-                  <PillButton
-                    key={day}
-                    label={weekdayIndexToLabel(day)}
-                    selected={selected}
-                    onPress={() =>
-                      setField(
-                        'recurrenceDays',
-                        selected
-                          ? draft.recurrenceDays.filter((value) => value !== day)
-                          : [...draft.recurrenceDays, day]
-                      )
-                    }
-                  />
-                );
-              })}
-            </View>
-          ) : null}
         </SectionCard>
 
         <SectionCard title="Notes">

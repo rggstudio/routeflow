@@ -3,12 +3,13 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { RideCard } from '@/components/RideCard';
-import { Screen, SectionCard } from '@/components/ui';
+import { ActionButton, Screen, SectionCard } from '@/components/ui';
 import {
   addDays,
   getDayLabel,
   getLongDateLabel,
   getStartOfWeek,
+  getWeekRangeLabel,
   toIsoDate,
 } from '@/lib/date';
 import { useRouteFlow } from '@/providers/RouteFlowProvider';
@@ -19,11 +20,21 @@ type Props = {
 };
 
 export function WeekScreen({ navigation }: Props) {
-  const weekStart = getStartOfWeek(new Date());
-  const [selectedDate, setSelectedDate] = useState(toIsoDate(weekStart));
+  const initialWeekStart = getStartOfWeek(new Date());
+  const [weekStart, setWeekStart] = useState(toIsoDate(initialWeekStart));
+  const [selectedDate, setSelectedDate] = useState(toIsoDate(initialWeekStart));
   const { getOccurrencesForDate } = useRouteFlow();
   const rides = getOccurrencesForDate(selectedDate);
-  const days = Array.from({ length: 7 }, (_, index) => toIsoDate(addDays(weekStart, index)));
+  const days = Array.from({ length: 7 }, (_, index) => toIsoDate(addDays(new Date(`${weekStart}T00:00:00`), index)));
+
+  const shiftWeek = (direction: -1 | 1) => {
+    const nextWeekStart = toIsoDate(addDays(new Date(`${weekStart}T00:00:00`), direction * 7));
+    const selectedDayOffset = days.findIndex((day) => day === selectedDate);
+    const nextOffset = selectedDayOffset >= 0 ? selectedDayOffset : 0;
+
+    setWeekStart(nextWeekStart);
+    setSelectedDate(toIsoDate(addDays(new Date(`${nextWeekStart}T00:00:00`), nextOffset)));
+  };
 
   return (
     <Screen>
@@ -31,11 +42,33 @@ export function WeekScreen({ navigation }: Props) {
         <Text className="text-[11px] font-semibold uppercase tracking-[2px] text-cyan-300">
           Weekly schedule
         </Text>
-        <Text className="mt-2 text-4xl font-semibold text-white">This week</Text>
+        <Text className="mt-2 text-4xl font-semibold text-white">Plan one week at a time</Text>
         <Text className="mt-3 text-base leading-7 text-slate-300">
-          Flip through the week fast, see every rider on the board, and open any trip for detail.
+          Move forward week by week, review every day in that window, and cancel any occurrence before it sneaks up on you.
         </Text>
       </View>
+
+      <SectionCard title="Week navigator">
+        <View className="flex-row gap-3">
+          <View className="flex-1">
+            <ActionButton
+              label="Previous week"
+              icon="chevron-back-outline"
+              onPress={() => shiftWeek(-1)}
+            />
+          </View>
+          <View className="flex-1">
+            <ActionButton
+              label="Next week"
+              icon="chevron-forward-outline"
+              onPress={() => shiftWeek(1)}
+            />
+          </View>
+        </View>
+        <Text className="mt-4 text-center text-sm font-semibold uppercase tracking-[1.8px] text-cyan-100">
+          {getWeekRangeLabel(weekStart)}
+        </Text>
+      </SectionCard>
 
       <SectionCard title="Pick a day">
         <ScrollView
