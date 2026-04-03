@@ -543,6 +543,21 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
           throw groupError;
         }
 
+        const existingOccurrenceIds = state.tripOccurrences
+          .filter((o) => o.tripGroupId === groupId)
+          .map((o) => o.id);
+
+        if (existingOccurrenceIds.length > 0) {
+          const { error: deleteLegsError } = await client
+            .from('trip_legs')
+            .delete()
+            .in('trip_occurrence_id', existingOccurrenceIds);
+
+          if (deleteLegsError) {
+            throw deleteLegsError;
+          }
+        }
+
         const { error: deleteOccurrencesError } = await client
           .from('trip_occurrences')
           .delete()
