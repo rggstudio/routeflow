@@ -235,10 +235,20 @@ export function SessionProvider({ children }: SessionProviderProps) {
         }
 
         const callbackUrl = new URL(result.url);
-        const authCode = callbackUrl.searchParams.get('code');
+
+        // Supabase may return params in the query string or hash fragment
+        const hashParams = new URLSearchParams(callbackUrl.hash.replace(/^#/, ''));
+        const authCode =
+          callbackUrl.searchParams.get('code') ?? hashParams.get('code');
         const authError =
           callbackUrl.searchParams.get('error_description') ??
-          callbackUrl.searchParams.get('error');
+          callbackUrl.searchParams.get('error') ??
+          hashParams.get('error_description') ??
+          hashParams.get('error');
+
+        console.log('[auth] callback url:', result.url);
+        console.log('[auth] authCode present:', Boolean(authCode));
+        console.log('[auth] authError:', authError);
 
         if (authError) {
           throw new Error(authError);
