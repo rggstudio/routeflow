@@ -248,6 +248,7 @@ export type Database = {
           canceled_at: string | null;
           cancellation_reason: string | null;
           completed_at: string | null;
+          picked_up_at: string | null;
           created_at: string;
           id: string;
           override_pay_amount: number | null;
@@ -263,6 +264,7 @@ export type Database = {
           canceled_at?: string | null;
           cancellation_reason?: string | null;
           completed_at?: string | null;
+          picked_up_at?: string | null;
           created_at?: string;
           id?: string;
           override_pay_amount?: number | null;
@@ -278,6 +280,7 @@ export type Database = {
           canceled_at?: string | null;
           cancellation_reason?: string | null;
           completed_at?: string | null;
+          picked_up_at?: string | null;
           created_at?: string;
           id?: string;
           override_pay_amount?: number | null;

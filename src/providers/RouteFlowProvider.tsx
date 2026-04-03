@@ -2,6 +2,7 @@ import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, 
 
 import {
   addDays,
+  combineDateAndTime,
   compareTime,
   fromIsoDate,
   getDefaultWeekdays,
@@ -134,6 +135,8 @@ function mapTripOccurrences(rows: TripOccurrenceRow[]): TripOccurrence[] {
     serviceDate: row.service_date,
     status: row.status as RideStatus,
     overridePayAmount: row.override_pay_amount,
+    pickedUpAt: row.picked_up_at,
+    completedAt: row.completed_at,
   }));
 }
 
@@ -497,7 +500,7 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
             return false;
           }
 
-          return `${ride.occurrence.serviceDate}T${ride.outboundLeg.pickupTime}:00` >= now.toISOString();
+          return combineDateAndTime(ride.occurrence.serviceDate, ride.outboundLeg.pickupTime) >= now;
         });
       },
       getWeekMetrics: (weekStartIso) => getWeekMetrics(weekStartIso, sortedViews),

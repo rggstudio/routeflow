@@ -9,11 +9,56 @@ type RideCardProps = {
   ride: RideOccurrenceView;
   onPress?: () => void;
   compact?: boolean;
+  statusStyle?: 'default' | 'weekly';
 };
 
-export function RideCard({ ride, onPress, compact = false }: RideCardProps) {
+export function RideCard({
+  ride,
+  onPress,
+  compact = false,
+  statusStyle = 'default',
+}: RideCardProps) {
+  const isWeeklyStyle = statusStyle === 'weekly';
+  const isCanceled = ride.occurrence.status === 'canceled' || ride.occurrence.status === 'canceled_paid';
+  const isCompleted = ride.occurrence.status === 'completed';
+  const isScheduled = ride.occurrence.status === 'scheduled';
+
+  const cardClasses = isWeeklyStyle
+    ? isCanceled
+      ? 'border-rose-400/50 bg-rose-950/25'
+      : isCompleted
+        ? 'border-emerald-400/45 bg-emerald-950/20'
+        : 'border-white/10 bg-slate-900/80'
+    : 'border-white/10 bg-slate-900/80';
+
+  const pillClasses = isWeeklyStyle
+    ? isCanceled
+      ? 'bg-rose-500/20'
+      : isCompleted
+        ? 'bg-emerald-500/20'
+        : isScheduled
+          ? 'bg-sky-500/20'
+          : 'bg-white/5'
+    : isCompleted
+      ? 'bg-emerald-500/20'
+      : 'bg-white/5';
+
+  const pillTextClasses = isWeeklyStyle
+    ? isCanceled
+      ? 'text-rose-100'
+      : isCompleted
+        ? 'text-emerald-100'
+        : isScheduled
+          ? 'text-sky-100'
+          : 'text-slate-300'
+    : isCompleted
+      ? 'text-emerald-100'
+      : 'text-slate-300';
+
+  const payAmount = isWeeklyStyle && ride.occurrence.status === 'canceled' ? 0 : ride.effectivePay;
+
   const content = (
-    <View className="rounded-[28px] border border-white/10 bg-slate-900/80 px-5 py-4">
+    <View className={`rounded-[28px] border px-5 py-4 ${cardClasses}`}>
       <View className="flex-row items-start justify-between gap-4">
         <View className="flex-1">
           <View className="flex-row items-center gap-1.5">
@@ -27,8 +72,8 @@ export function RideCard({ ride, onPress, compact = false }: RideCardProps) {
             </Text>
           </View>
         </View>
-        <View className="rounded-full bg-white/5 px-3 py-1">
-          <Text className="text-xs font-semibold uppercase tracking-[1.4px] text-slate-300">
+        <View className={`rounded-full px-3 py-1 ${pillClasses}`}>
+          <Text className={`text-xs font-semibold uppercase tracking-[1.4px] ${pillTextClasses}`}>
             {getStatusLabel(ride.occurrence.status)}
           </Text>
         </View>
@@ -77,7 +122,7 @@ export function RideCard({ ride, onPress, compact = false }: RideCardProps) {
         </View>
         <View className="flex-row items-center gap-1">
           <Ionicons name="cash-outline" size={14} color="#a5f3fc" />
-          <Text className="text-base font-semibold text-cyan-200">${ride.effectivePay.toFixed(2)}</Text>
+          <Text className="text-base font-semibold text-cyan-200">${payAmount.toFixed(2)}</Text>
         </View>
       </View>
     </View>

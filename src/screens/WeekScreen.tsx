@@ -20,20 +20,19 @@ type Props = {
 };
 
 export function WeekScreen({ navigation }: Props) {
+  const today = toIsoDate(new Date());
   const initialWeekStart = getStartOfWeek(new Date());
   const [weekStart, setWeekStart] = useState(toIsoDate(initialWeekStart));
-  const [selectedDate, setSelectedDate] = useState(toIsoDate(initialWeekStart));
-  const { getOccurrencesForDate } = useRouteFlow();
-  const rides = getOccurrencesForDate(selectedDate);
+  const [selectedDate, setSelectedDate] = useState(today);
+  const { getOccurrencesForWeek } = useRouteFlow();
+  const rides = getOccurrencesForWeek(weekStart).filter((ride) => ride.occurrence.serviceDate === selectedDate);
   const days = Array.from({ length: 7 }, (_, index) => toIsoDate(addDays(new Date(`${weekStart}T00:00:00`), index)));
 
   const shiftWeek = (direction: -1 | 1) => {
     const nextWeekStart = toIsoDate(addDays(new Date(`${weekStart}T00:00:00`), direction * 7));
-    const selectedDayOffset = days.findIndex((day) => day === selectedDate);
-    const nextOffset = selectedDayOffset >= 0 ? selectedDayOffset : 0;
 
     setWeekStart(nextWeekStart);
-    setSelectedDate(toIsoDate(addDays(new Date(`${nextWeekStart}T00:00:00`), nextOffset)));
+    setSelectedDate(nextWeekStart);
   };
 
   return (
@@ -117,6 +116,7 @@ export function WeekScreen({ navigation }: Props) {
           <RideCard
             key={ride.occurrence.id}
             ride={ride}
+            statusStyle="weekly"
             onPress={() =>
               navigation.navigate({
                 name: 'RideDetail',

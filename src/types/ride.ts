@@ -28,6 +28,8 @@ export type TripOccurrence = {
   serviceDate: string;
   status: RideStatus;
   overridePayAmount: number | null;
+  pickedUpAt: string | null;
+  completedAt: string | null;
 };
 
 export type TripLeg = {

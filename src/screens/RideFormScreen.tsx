@@ -149,7 +149,11 @@ export function RideFormScreen({ navigation, route }: Props) {
         });
       }
 
-      navigation.goBack();
+      if (isEditing) {
+        navigation.pop(2);
+      } else {
+        navigation.goBack();
+      }
     } catch (error) {
       const message =
         error instanceof Error

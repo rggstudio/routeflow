@@ -48,11 +48,19 @@ type SectionCardProps = {
   title?: string;
   eyebrow?: string;
   children: ReactNode;
+  className?: string;
 };
 
-export function SectionCard({ title, eyebrow, children }: SectionCardProps) {
+export function SectionCard({ title, eyebrow, children, className }: SectionCardProps) {
+  const classes = [
+    'mb-4 overflow-hidden rounded-[28px] border border-white/10 bg-slate-900/80 px-5 py-5',
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <View className="mb-4 overflow-hidden rounded-[28px] border border-white/10 bg-slate-900/80 px-5 py-5">
+    <View className={classes}>
       {eyebrow ? (
         <Text className="text-[11px] font-semibold uppercase tracking-[2px] text-cyan-300">
           {eyebrow}

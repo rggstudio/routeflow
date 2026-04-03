@@ -7,9 +7,10 @@ import { captureRef } from 'react-native-view-shot';
 import { BottomSheetScreen } from '@/components/BottomSheetScreen';
 import { ActionButton, PillButton, SectionCard } from '@/components/ui';
 import { getFullDateLabel, getWeekRangeLabel } from '@/lib/date';
-import { shareReport } from '@/lib/routeFlow';
+import { getStatusLabel, shareReport } from '@/lib/routeFlow';
 import { useRouteFlow } from '@/providers/RouteFlowProvider';
 import { RootStackParamList } from '@/types/navigation';
+import { RideStatus } from '@/types/ride';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WeeklyReport'>;
 type WeekMetrics = ReturnType<ReturnType<typeof useRouteFlow>['getWeekMetrics']>;
@@ -101,11 +102,47 @@ function getMonthDayCode(isoDate: string) {
   return `${month}-${day}`;
 }
 
-function buildReportText(
-  name: string,
-  weekStart: string,
-  metrics: WeekMetrics
-) {
+function getRideDisplayAmount(status: RideStatus, amount: number) {
+  return status === 'canceled' ? 0 : amount;
+}
+
+function getRideSummaryStyles(status: RideStatus) {
+  if (status === 'canceled') {
+    return {
+      card: 'border-rose-400/50 bg-rose-950/20',
+      amount: 'text-rose-100',
+      pill: 'bg-rose-500/20',
+      pillText: 'text-rose-100',
+    };
+  }
+
+  if (status === 'canceled_paid') {
+    return {
+      card: 'border-amber-400/50 bg-amber-950/20',
+      amount: 'text-amber-100',
+      pill: 'bg-amber-500/20',
+      pillText: 'text-amber-100',
+    };
+  }
+
+  if (status === 'completed') {
+    return {
+      card: 'border-emerald-400/40 bg-emerald-950/15',
+      amount: 'text-emerald-100',
+      pill: 'bg-emerald-500/20',
+      pillText: 'text-emerald-100',
+    };
+  }
+
+  return {
+    card: 'border-white/10 bg-white/5',
+    amount: 'text-cyan-200',
+    pill: 'bg-sky-500/20',
+    pillText: 'text-sky-100',
+  };
+}
+
+function buildReportText(name: string, weekStart: string, metrics: WeekMetrics) {
   const lines = [
     `RouteFlow Weekly Report for Driver: ${name}`,
     `Week: ${getWeekRangeLabel(weekStart)}`,
@@ -115,7 +152,7 @@ function buildReportText(
     'Breakdown of rides:',
     ...metrics.rides.map(
       (ride) =>
-        `${getMonthDayCode(ride.occurrence.serviceDate)} | ${ride.group.riderName} | $${ride.effectivePay.toFixed(2)}`
+        `${getMonthDayCode(ride.occurrence.serviceDate)} | ${ride.group.riderName} | ${getStatusLabel(ride.occurrence.status)} | $${getRideDisplayAmount(ride.occurrence.status, ride.effectivePay).toFixed(2)}`
     ),
   ];
 
@@ -135,6 +172,10 @@ export function WeeklyReportScreen({ navigation, route }: Props) {
   const selectedBackground =
     BACKGROUND_OPTIONS.find((option) => option.id === selectedBackgroundId) ?? BACKGROUND_OPTIONS[0];
   const avatarInitials = useMemo(() => getInitials(driverName), [driverName]);
+  const imagePreviewRides = useMemo(
+    () => metrics.rides.filter((ride) => getRideDisplayAmount(ride.occurrence.status, ride.effectivePay) > 0),
+    [metrics.rides]
+  );
 
   const handleShareImage = async () => {
     if (!reportCardRef.current) {
@@ -197,22 +238,36 @@ export function WeeklyReportScreen({ navigation, route }: Props) {
           </View>
 
           {metrics.rides.length > 0 ? (
-            metrics.rides.map((ride) => (
-              <View
-                key={ride.occurrence.id}
-                className="mb-3 flex-row items-center justify-between rounded-3xl bg-white/5 px-4 py-4"
-              >
-                <View className="flex-1 pr-4">
-                  <Text className="font-semibold text-white">{ride.group.riderName}</Text>
-                  <Text className="mt-1 text-sm text-slate-400">
-                    {getFullDateLabel(ride.occurrence.serviceDate)}
-                  </Text>
+            metrics.rides.map((ride) => {
+              const styles = getRideSummaryStyles(ride.occurrence.status);
+              const displayAmount = getRideDisplayAmount(ride.occurrence.status, ride.effectivePay);
+
+              return (
+                <View
+                  key={ride.occurrence.id}
+                  className={`mb-3 rounded-3xl border px-4 py-4 ${styles.card}`}
+                >
+                  <View className="flex-row items-start justify-between gap-4">
+                    <View className="flex-1 pr-4">
+                      <Text className="font-semibold text-white">{ride.group.riderName}</Text>
+                      <Text className="mt-1 text-sm text-slate-400">
+                        {getFullDateLabel(ride.occurrence.serviceDate)}
+                      </Text>
+                    </View>
+                    <View className={`rounded-full px-3 py-1 ${styles.pill}`}>
+                      <Text className={`text-xs font-semibold uppercase tracking-[1.4px] ${styles.pillText}`}>
+                        {getStatusLabel(ride.occurrence.status)}
+                      </Text>
+                    </View>
+                  </View>
+                  <View className="mt-4 flex-row items-center justify-end">
+                    <Text className={`text-base font-semibold ${styles.amount}`}>
+                      ${displayAmount.toFixed(2)}
+                    </Text>
+                  </View>
                 </View>
-                <Text className="text-base font-semibold text-cyan-200">
-                  ${ride.effectivePay.toFixed(2)}
-                </Text>
-              </View>
-            ))
+              );
+            })
           ) : (
             <Text className="text-sm leading-6 text-slate-300">
               No rides were logged in this week, so the share image will show a clean empty-state summary.
@@ -392,8 +447,8 @@ export function WeeklyReportScreen({ navigation, route }: Props) {
                   Breakdown of rides:
                 </Text>
 
-                {metrics.rides.length > 0 ? (
-                  metrics.rides.map((ride) => (
+                {imagePreviewRides.length > 0 ? (
+                  imagePreviewRides.map((ride) => (
                     <View
                       key={ride.occurrence.id}
                       style={{
@@ -413,7 +468,7 @@ export function WeeklyReportScreen({ navigation, route }: Props) {
                         }}
                       >
                         {getMonthDayCode(ride.occurrence.serviceDate)} | {ride.group.riderName} | $
-                        {ride.effectivePay.toFixed(2)}
+                        {getRideDisplayAmount(ride.occurrence.status, ride.effectivePay).toFixed(2)}
                       </Text>
                     </View>
                   ))
@@ -433,7 +488,7 @@ export function WeeklyReportScreen({ navigation, route }: Props) {
                         lineHeight: 18,
                       }}
                     >
-                      No rides recorded for this week.
+                      No money-making rides recorded for this week.
                     </Text>
                   </View>
                 )}
@@ -457,7 +512,7 @@ export function WeeklyReportScreen({ navigation, route }: Props) {
           <SectionCard title="Export options">
             <Text className="text-sm leading-6 text-slate-300">
               The image export captures the styled card with your selected background, avatar initials,
-              totals, and ride-by-ride weekly breakdown.
+              totals, and only the rides that made money that week.
             </Text>
           </SectionCard>
         </View>
