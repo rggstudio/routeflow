@@ -12,13 +12,6 @@ const isValidUrl = (url: string) => {
 
 const urlValid = isValidUrl(rawSupabaseUrl);
 
-if (__DEV__) {
-  console.log('[env] SUPABASE_URL present:', rawSupabaseUrl.length > 0);
-  console.log('[env] SUPABASE_URL valid:', urlValid);
-  console.log('[env] SUPABASE_URL starts with:', rawSupabaseUrl.slice(0, 10));
-  console.log('[env] ANON_KEY present:', rawSupabaseAnonKey.length > 0);
-}
-
 export const env = {
   supabaseUrl: rawSupabaseUrl,
   supabaseAnonKey: rawSupabaseAnonKey,
