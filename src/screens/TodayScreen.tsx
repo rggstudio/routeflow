@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -18,11 +19,33 @@ type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Dashboard'>;
 };
 
+function getNextRideEyebrow(isoDate: string, time: string, now: Date) {
+  const countdown = getRelativeCountdown(isoDate, time, now);
+
+  if (countdown.startsWith('Starts in ')) {
+    return `Next ride in ${countdown.replace('Starts in ', '')}`;
+  }
+
+  return `Next ride ${countdown.toLowerCase()}`;
+}
+
 export function TodayScreen({ navigation }: Props) {
   const { state, getOccurrencesForDate, getUpcomingOccurrences } = useRouteFlow();
-  const todaysRides = getOccurrencesForDate(todayIso());
+  const [now, setNow] = useState(() => new Date());
+  const today = todayIso();
+  const todaysRides = getOccurrencesForDate(today);
   const upcomingRides = getUpcomingOccurrences();
   const nextRide = upcomingRides[0] ?? null;
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setNow(new Date());
+    }, 30000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);
 
   return (
     <Screen>
@@ -34,7 +57,7 @@ export function TodayScreen({ navigation }: Props) {
           Hey {state.profile.name.split(' ')[0]}
         </Text>
         <Text className="mt-3 text-base leading-7 text-slate-300">
-          {getLongDateLabel(todayIso())}. You have {todaysRides.length} rides on the board today.
+          {getLongDateLabel(today)}. You have {todaysRides.length} rides on the board today.
         </Text>
       </View>
 
@@ -49,7 +72,11 @@ export function TodayScreen({ navigation }: Props) {
 
       {nextRide ? (
         <SectionCard
-          eyebrow="Next ride"
+          eyebrow={getNextRideEyebrow(
+            nextRide.occurrence.serviceDate,
+            nextRide.outboundLeg.pickupTime,
+            now
+          )}
           title={`${nextRide.group.riderName} - ${formatTime(nextRide.outboundLeg.pickupTime)}`}
         >
           <View className="gap-1.5">
@@ -72,23 +99,20 @@ export function TodayScreen({ navigation }: Props) {
           </View>
 
           <View className="mt-4 flex-row items-center gap-2">
-            <Ionicons name="time-outline" size={15} color="#67e8f9" />
+            <Ionicons name="calendar-outline" size={15} color="#67e8f9" />
             <Text className="text-base font-semibold text-cyan-200">
-              {getRelativeCountdown(nextRide.occurrence.serviceDate, nextRide.outboundLeg.pickupTime)}
+              {getLongDateLabel(nextRide.occurrence.serviceDate)}
             </Text>
           </View>
 
-          <View className="mt-2 flex-row items-center gap-2">
-            <Ionicons name="layers-outline" size={14} color="#64748b" />
-            <Text className="text-sm text-slate-400">
-              Ride{' '}
-              {Math.max(
-                1,
-                todaysRides.findIndex((ride) => ride.occurrence.id === nextRide.occurrence.id) + 1
-              )}{' '}
-              of {Math.max(1, todaysRides.length)}
-            </Text>
-          </View>
+          {nextRide.occurrence.serviceDate === today && (
+            <View className="mt-2 flex-row items-center gap-2">
+              <Ionicons name="layers-outline" size={14} color="#64748b" />
+              <Text className="text-sm text-slate-400">
+                {`Ride ${Math.max(1, todaysRides.findIndex((ride) => ride.occurrence.id === nextRide.occurrence.id) + 1)} of ${Math.max(1, todaysRides.length)}`}
+              </Text>
+            </View>
+          )}
 
           <View className="mt-5 gap-3">
             <ActionButton

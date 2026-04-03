@@ -12,6 +12,7 @@ import {
   sendQuickMessage,
 } from '@/lib/routeFlow';
 import { useRouteFlow } from '@/providers/RouteFlowProvider';
+import { useToast } from '@/providers/ToastProvider';
 import { RootStackParamList } from '@/types/navigation';
 import { RideStatus } from '@/types/ride';
 
@@ -35,11 +36,18 @@ export function RideDetailScreen({ navigation, route }: Props) {
     cancelSeries,
   } = useRouteFlow();
 
+  const { showToast } = useToast();
   const view = getOccurrenceView(route.params.occurrenceId);
 
-  const runRideAction = async (action: () => Promise<void>, errorTitle: string) => {
+  const runRideAction = async (
+    action: () => Promise<void>,
+    successTitle: string,
+    errorTitle: string,
+    successMessage?: string
+  ) => {
     try {
       await action();
+      showToast({ title: successTitle, message: successMessage });
     } catch (error) {
       Alert.alert(errorTitle, error instanceof Error ? error.message : 'Try again.');
     }
@@ -170,7 +178,9 @@ export function RideDetailScreen({ navigation, route }: Props) {
                     onPress={() =>
                       runRideAction(
                         () => updateOccurrenceStatus(view.occurrence.id, status),
-                        'Status update failed'
+                        'Ride status updated',
+                        'Status update failed',
+                        `${view.group.riderName} is now ${getStatusLabel(status).toLowerCase()}.`
                       )
                     }
                   />
@@ -198,7 +208,9 @@ export function RideDetailScreen({ navigation, route }: Props) {
                       onPress: () =>
                         void runRideAction(
                           () => cancelOccurrence(view.occurrence.id),
-                          'Cancel ride failed'
+                          'Ride canceled',
+                          'Cancel ride failed',
+                          `${view.group.riderName} was marked canceled.`
                         ),
                     },
                   ])
@@ -219,7 +231,9 @@ export function RideDetailScreen({ navigation, route }: Props) {
                         onPress: () =>
                           void runRideAction(
                             () => cancelOccurrenceWithPay(view.occurrence.id),
-                            'Cancel with pay failed'
+                            'Ride canceled with pay',
+                            'Cancel with pay failed',
+                            `${view.group.riderName} was canceled and payment was kept.`
                           ),
                       },
                     ]
@@ -238,7 +252,9 @@ export function RideDetailScreen({ navigation, route }: Props) {
                       onPress: () =>
                         void runRideAction(
                           () => cancelSeries(view.group.id),
-                          'Cancel series failed'
+                          'Series canceled',
+                          'Cancel series failed',
+                          `All scheduled rides for ${view.group.riderName} were canceled.`
                         ),
                     },
                   ])

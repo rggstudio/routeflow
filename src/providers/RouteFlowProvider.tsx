@@ -473,7 +473,9 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
       getOccurrenceView: (occurrenceId) =>
         sortedViews.find((ride) => ride.occurrence.id === occurrenceId) ?? null,
       getOccurrencesForDate: (isoDate) =>
-        sortedViews.filter((ride) => ride.occurrence.serviceDate === isoDate),
+        sortedViews.filter(
+          (ride) => ride.occurrence.serviceDate === isoDate && !isCanceledStatus(ride.occurrence.status)
+        ),
       getOccurrencesForWeek: (weekStartIso) => getWeekMetrics(weekStartIso, sortedViews).rides,
       getUpcomingOccurrences: () => {
         const now = new Date();

@@ -12,6 +12,7 @@ import {
   ToggleRow,
 } from '@/components/ui';
 import { useSession } from '@/providers/SessionProvider';
+import { useToast } from '@/providers/ToastProvider';
 import { useRouteFlow } from '@/providers/RouteFlowProvider';
 import { NavigationApp } from '@/types/ride';
 
@@ -34,6 +35,7 @@ function navLabel(app: NavigationApp) {
 export function AccountScreen() {
   const { state, updateProfile, updatePreferences } = useRouteFlow();
   const { isConfigured, session, signOut } = useSession();
+  const { showToast } = useToast();
   const [profileDraft, setProfileDraft] = useState(state.profile);
   const [preferencesDraft, setPreferencesDraft] = useState(state.preferences);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -51,6 +53,7 @@ export function AccountScreen() {
     try {
       setIsSavingProfile(true);
       await updateProfile(profileDraft);
+      showToast({ title: 'Profile saved', message: 'Your account details are up to date.' });
     } catch (error) {
       Alert.alert('Profile save failed', error instanceof Error ? error.message : 'Try again.');
     } finally {
@@ -62,6 +65,7 @@ export function AccountScreen() {
     try {
       setIsSavingPreferences(true);
       await updatePreferences(preferencesDraft);
+      showToast({ title: 'Preferences saved', message: 'RouteFlow updated your default settings.' });
     } catch (error) {
       Alert.alert(
         'Preferences save failed',
@@ -164,7 +168,7 @@ export function AccountScreen() {
         </View>
       </SectionCard>
 
-      <SectionCard title="Auth status">
+      <SectionCard>
         <Text className="text-sm leading-6 text-slate-300">
           {isConfigured
             ? session

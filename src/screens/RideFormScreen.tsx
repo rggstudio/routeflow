@@ -4,11 +4,11 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { BottomSheetScreen } from '@/components/BottomSheetScreen';
 // React Native resolves this to `.native` or `.web` at runtime.
-// eslint-disable-next-line import/no-unresolved
 import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
 import { ActionButton, InputField, PillButton, SectionCard, SelectField } from '@/components/ui';
 import { formatTime, fromIsoDate, getLongDateLabel, todayIso, toIsoDate, weekdayIndexToLabel } from '@/lib/date';
 import { useRouteFlow } from '@/providers/RouteFlowProvider';
+import { useToast } from '@/providers/ToastProvider';
 import { RootStackParamList } from '@/types/navigation';
 import { RecurrenceType, RideDraft, TripType } from '@/types/ride';
 
@@ -50,6 +50,7 @@ function getTimeDate(baseDateIso: string, time: string) {
 
 export function RideFormScreen({ navigation, route }: Props) {
   const { addRide, createDraftForGroup, updateRide } = useRouteFlow();
+  const { showToast } = useToast();
   const isEditing = Boolean(route.params?.groupId);
   const [activePicker, setActivePicker] = useState<ActivePicker>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -136,8 +137,16 @@ export function RideFormScreen({ navigation, route }: Props) {
       setIsSubmitting(true);
       if (isEditing && route.params?.groupId) {
         await updateRide(route.params.groupId, draft);
+        showToast({
+          title: 'Ride updated',
+          message: `${draft.riderName.trim() || 'Rider'} was saved successfully.`,
+        });
       } else {
         await addRide(draft);
+        showToast({
+          title: 'Ride added',
+          message: `${draft.riderName.trim() || 'Rider'} is now on your schedule.`,
+        });
       }
 
       navigation.goBack();

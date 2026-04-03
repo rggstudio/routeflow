@@ -7,17 +7,20 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootNavigator } from '@/navigation/RootNavigator';
 import { RouteFlowProvider } from '@/providers/RouteFlowProvider';
 import { SessionProvider } from '@/providers/SessionProvider';
+import { ToastProvider } from '@/providers/ToastProvider';
 
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <SessionProvider>
-          <RouteFlowProvider>
-            <StatusBar style="light" />
-            <RootNavigator />
-          </RouteFlowProvider>
-        </SessionProvider>
+        <ToastProvider>
+          <SessionProvider>
+            <RouteFlowProvider>
+              <StatusBar style="light" />
+              <RootNavigator />
+            </RouteFlowProvider>
+          </SessionProvider>
+        </ToastProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
