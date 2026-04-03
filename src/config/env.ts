@@ -1,5 +1,5 @@
-const rawSupabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+const rawSupabaseUrl = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? '').trim();
+const rawSupabaseAnonKey = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
 
 const isValidUrl = (url: string) => {
   try {
@@ -10,10 +10,17 @@ const isValidUrl = (url: string) => {
   }
 };
 
-const supabaseUrl = rawSupabaseUrl;
+const urlValid = isValidUrl(rawSupabaseUrl);
+
+if (__DEV__) {
+  console.log('[env] SUPABASE_URL present:', rawSupabaseUrl.length > 0);
+  console.log('[env] SUPABASE_URL valid:', urlValid);
+  console.log('[env] SUPABASE_URL starts with:', rawSupabaseUrl.slice(0, 10));
+  console.log('[env] ANON_KEY present:', rawSupabaseAnonKey.length > 0);
+}
 
 export const env = {
-  supabaseUrl,
-  supabaseAnonKey,
-  isSupabaseConfigured: Boolean(supabaseUrl && supabaseAnonKey && isValidUrl(supabaseUrl)),
+  supabaseUrl: rawSupabaseUrl,
+  supabaseAnonKey: rawSupabaseAnonKey,
+  isSupabaseConfigured: Boolean(rawSupabaseUrl && rawSupabaseAnonKey && urlValid),
 };
