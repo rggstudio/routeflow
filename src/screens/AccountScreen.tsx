@@ -309,7 +309,7 @@ export function AccountScreen() {
           />
           <ActionButton
             label="Privacy Policy"
-            onPress={() => Linking.openURL('https://example.com/privacy')}
+            onPress={() => Linking.openURL('https://route-flow-app.vercel.app/privacy')}
           />
         </View>
       </SectionCard>
