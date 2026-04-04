@@ -14,7 +14,6 @@ type Suggestion = {
   mapbox_id: string;
   name: string;
   place_formatted: string;
-  full_address: string;
 };
 
 type Props = {
@@ -27,12 +26,7 @@ type Props = {
 
 const MAPBOX_TOKEN: string = Constants.expoConfig?.extra?.mapboxKey ?? '';
 const SUGGEST_URL = 'https://api.mapbox.com/search/searchbox/v1/suggest';
-
-function formatAddress(suggestion: Suggestion): string {
-  if (suggestion.full_address) return suggestion.full_address;
-  if (suggestion.place_formatted) return `${suggestion.name}, ${suggestion.place_formatted}`;
-  return suggestion.name;
-}
+const RETRIEVE_URL = 'https://api.mapbox.com/search/searchbox/v1/retrieve';
 
 export function AddressAutocomplete({ label, value, onChangeText, placeholder, sessionToken }: Props) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -41,6 +35,7 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastQueryRef = useRef('');
   const suppressFetchRef = useRef(false);
+  const isPressingSuggestionRef = useRef(false);
 
   const fetchSuggestions = useCallback(async (query: string) => {
     if (!MAPBOX_TOKEN || query.length < 3) {
@@ -93,17 +88,50 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
     }, 300);
   }, [fetchSuggestions, onChangeText]);
 
-  const handleSelect = useCallback((suggestion: Suggestion) => {
-    const address = formatAddress(suggestion);
+  const handleSelect = useCallback(async (suggestion: Suggestion) => {
     suppressFetchRef.current = true;
-    onChangeText(address);
     setSuggestions([]);
     Keyboard.dismiss();
-  }, [onChangeText]);
+
+    if (!MAPBOX_TOKEN) {
+      onChangeText(suggestion.place_formatted
+        ? `${suggestion.name}, ${suggestion.place_formatted}`
+        : suggestion.name);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const params = new URLSearchParams({
+        access_token: MAPBOX_TOKEN,
+        session_token: sessionToken,
+      });
+      const response = await fetch(`${RETRIEVE_URL}/${suggestion.mapbox_id}?${params}`);
+      if (!response.ok) throw new Error('Mapbox retrieve failed');
+
+      const data = await response.json();
+      const feature = data.features?.[0];
+      const full = feature?.properties?.full_address
+        ?? feature?.properties?.name_preferred
+        ?? feature?.properties?.name
+        ?? `${suggestion.name}, ${suggestion.place_formatted}`;
+      onChangeText(full);
+    } catch {
+      onChangeText(suggestion.place_formatted
+        ? `${suggestion.name}, ${suggestion.place_formatted}`
+        : suggestion.name);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sessionToken, onChangeText]);
 
   const handleBlur = useCallback(() => {
     setIsFocused(false);
-    setTimeout(() => setSuggestions([]), 150);
+    setTimeout(() => {
+      if (!isPressingSuggestionRef.current) {
+        setSuggestions([]);
+      }
+    }, 200);
   }, []);
 
   useEffect(() => {
@@ -156,7 +184,13 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
           {suggestions.map((suggestion, index) => (
             <Pressable
               key={suggestion.mapbox_id}
-              onPress={() => handleSelect(suggestion)}
+              onPressIn={() => {
+                isPressingSuggestionRef.current = true;
+              }}
+              onPressOut={() => {
+                isPressingSuggestionRef.current = false;
+              }}
+              onPress={() => void handleSelect(suggestion)}
               className={`flex-row items-start gap-3 px-4 py-3 active:bg-white/10 ${
                 index < suggestions.length - 1 ? 'border-b border-white/5' : ''
               }`}
