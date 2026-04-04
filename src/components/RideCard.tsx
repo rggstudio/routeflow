@@ -42,29 +42,21 @@ export function RideCard({
         : 'border-white/10 bg-slate-900/80'
     : 'border-white/10 bg-slate-900/80';
 
-  const pillClasses = isWeeklyStyle
-    ? isCanceled
-      ? 'bg-rose-500/20'
-      : isCompleted
-        ? 'bg-emerald-500/20'
-        : isScheduled
-          ? 'bg-sky-500/20'
-          : 'bg-white/5'
+  const pillClasses = isCanceled
+    ? 'bg-rose-500/20'
     : isCompleted
       ? 'bg-emerald-500/20'
-      : 'bg-white/5';
+      : isScheduled
+        ? 'bg-sky-500/20'
+        : 'bg-white/5';
 
-  const pillTextClasses = isWeeklyStyle
-    ? isCanceled
-      ? 'text-rose-100'
-      : isCompleted
-        ? 'text-emerald-100'
-        : isScheduled
-          ? 'text-sky-100'
-          : 'text-slate-300'
+  const pillTextClasses = isCanceled
+    ? 'text-rose-100'
     : isCompleted
       ? 'text-emerald-100'
-      : 'text-slate-300';
+      : isScheduled
+        ? 'text-sky-100'
+        : 'text-slate-300';
 
   const payAmount = isWeeklyStyle && ride.occurrence.status === 'canceled' ? 0 : ride.effectivePay;
 
