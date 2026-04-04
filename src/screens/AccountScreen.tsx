@@ -305,7 +305,7 @@ export function AccountScreen() {
         <View className="gap-3">
           <ActionButton
             label="Help Center"
-            onPress={() => Alert.alert('Help Center', 'Support content can be linked here next.')}
+            onPress={() => Linking.openURL('https://route-flow-app.vercel.app/')}
           />
           <ActionButton
             label="Privacy Policy"
