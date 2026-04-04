@@ -21,7 +21,7 @@ export function Screen({ children, scroll = true, avatarPlacement = 'right', pad
     ) : null;
 
   const content = scroll ? (
-    <ScrollView contentContainerStyle={{ padding: 20, paddingTop, paddingBottom: 140 }} keyboardShouldPersistTaps="always">
+    <ScrollView contentContainerStyle={{ padding: 20, paddingTop, paddingBottom: 140 }} keyboardShouldPersistTaps="handled">
       <View className="relative">
         {rightAvatar}
         {children}

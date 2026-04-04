@@ -181,7 +181,7 @@ export function RideFormScreen({ navigation, route }: Props) {
 
   return (
     <BottomSheetScreen onClose={() => navigation.goBack()}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="always">
+      <ScrollView contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View className="mb-6">
           <Text className="text-[11px] font-semibold uppercase tracking-[2px] text-cyan-300">
             {isEditing ? 'Edit ride' : 'Add ride'}
