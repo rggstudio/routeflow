@@ -31,10 +31,13 @@ const RETRIEVE_URL = 'https://api.mapbox.com/search/searchbox/v1/retrieve';
 export function AddressAutocomplete({ label, value, onChangeText, placeholder, sessionToken }: Props) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  // isFocused drives only the border colour — NOT the dropdown visibility.
   const [isFocused, setIsFocused] = useState(false);
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastQueryRef = useRef('');
   const suppressFetchRef = useRef(false);
+  // Set true on onPressIn so handleBlur knows not to clear suggestions yet.
   const isPressingSuggestionRef = useRef(false);
 
   const fetchSuggestions = useCallback(async (query: string) => {
@@ -89,6 +92,7 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
   }, [fetchSuggestions, onChangeText]);
 
   const handleSelect = useCallback(async (suggestion: Suggestion) => {
+    // Suppress any in-flight debounce and clear the dropdown immediately.
     suppressFetchRef.current = true;
     setSuggestions([]);
     Keyboard.dismiss();
@@ -100,6 +104,7 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
       return;
     }
 
+    // Retrieve the full address (includes house number) via the retrieve endpoint.
     setIsLoading(true);
     try {
       const params = new URLSearchParams({
@@ -111,10 +116,13 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
 
       const data = await response.json();
       const feature = data.features?.[0];
-      const full = feature?.properties?.full_address
-        ?? feature?.properties?.name_preferred
-        ?? feature?.properties?.name
-        ?? `${suggestion.name}, ${suggestion.place_formatted}`;
+      const full =
+        feature?.properties?.full_address ??
+        feature?.properties?.name_preferred ??
+        feature?.properties?.name ??
+        (suggestion.place_formatted
+          ? `${suggestion.name}, ${suggestion.place_formatted}`
+          : suggestion.name);
       onChangeText(full);
     } catch {
       onChangeText(suggestion.place_formatted
@@ -127,6 +135,8 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
 
   const handleBlur = useCallback(() => {
     setIsFocused(false);
+    // Wait long enough for onPress to fire before clearing the list.
+    // The isPressingSuggestion guard prevents clearing while the user is mid-tap.
     setTimeout(() => {
       if (!isPressingSuggestionRef.current) {
         setSuggestions([]);
@@ -140,7 +150,10 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
     };
   }, []);
 
-  const showSuggestions = isFocused && suggestions.length > 0;
+  // Dropdown is visible whenever there are suggestions — independent of isFocused.
+  // This is the critical detail: isFocused going false (onBlur) must NOT hide the
+  // dropdown, because onPress fires after onBlur and the Pressable must still be mounted.
+  const showSuggestions = suggestions.length > 0;
 
   return (
     <View className="mb-4">
