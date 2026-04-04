@@ -45,6 +45,7 @@ type RouteFlowContextValue = {
   isHydrated: boolean;
   getOccurrenceView: (occurrenceId: string) => RideOccurrenceView | null;
   getOccurrencesForDate: (isoDate: string) => RideOccurrenceView[];
+  getCanceledOccurrencesForDate: (isoDate: string) => RideOccurrenceView[];
   getOccurrencesForWeek: (weekStartIso: string) => RideOccurrenceView[];
   getUpcomingOccurrences: () => RideOccurrenceView[];
   getWeekMetrics: (weekStartIso: string) => WeekMetrics;
@@ -573,6 +574,10 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
       getOccurrencesForDate: (isoDate) =>
         sortedViews.filter(
           (ride) => ride.occurrence.serviceDate === isoDate && !isCanceledStatus(ride.occurrence.status)
+        ),
+      getCanceledOccurrencesForDate: (isoDate) =>
+        sortedViews.filter(
+          (ride) => ride.occurrence.serviceDate === isoDate && isCanceledStatus(ride.occurrence.status)
         ),
       getOccurrencesForWeek: (weekStartIso) => getWeekMetrics(weekStartIso, sortedViews).rides,
       getUpcomingOccurrences: () => {

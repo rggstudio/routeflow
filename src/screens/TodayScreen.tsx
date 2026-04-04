@@ -156,11 +156,12 @@ function HomeRideSpotlight({
 }
 
 export function TodayScreen({ navigation }: Props) {
-  const { state, getOccurrencesForDate, getUpcomingOccurrences, updateOccurrenceStatus } =
+  const { state, getOccurrencesForDate, getCanceledOccurrencesForDate, getUpcomingOccurrences, updateOccurrenceStatus } =
     useRouteFlow();
   const [now, setNow] = useState(() => new Date());
   const today = todayIso();
   const todaysRides = getOccurrencesForDate(today);
+  const canceledTodayRides = getCanceledOccurrencesForDate(today);
   const upcomingRides = getUpcomingOccurrences();
   const inProgressRide = todaysRides.find((ride) => ride.occurrence.status === 'in_progress') ?? null;
   const nextRide =
@@ -203,9 +204,16 @@ export function TodayScreen({ navigation }: Props) {
         <StatTile label="Today" value={`${todaysRides.length} ${todaysRideLabel}`} />
         <StatTile
           label="Completed"
-          value={`${todaysRides.filter((ride) => ride.occurrence.status === 'completed').length}`}
+          value={`${completedTodayRides.length}`}
           tone="positive"
         />
+        {canceledTodayRides.length > 0 ? (
+          <StatTile
+            label="Canceled"
+            value={`${canceledTodayRides.length}`}
+            tone="negative"
+          />
+        ) : null}
       </View>
 
       {inProgressRide ? (
@@ -303,6 +311,27 @@ export function TodayScreen({ navigation }: Props) {
           </Text>
         </SectionCard>
       )}
+
+      {canceledTodayRides.length > 0 ? (
+        <>
+          <View className="mb-3 mt-2 flex-row items-center justify-between">
+            <Text className="text-xl font-semibold text-white">Canceled today</Text>
+          </View>
+          {canceledTodayRides.map((ride) => (
+            <RideCard
+              key={ride.occurrence.id}
+              ride={ride}
+              compact
+              onPress={() =>
+                navigation.navigate({
+                  name: 'RideDetail',
+                  params: { occurrenceId: ride.occurrence.id },
+                })
+              }
+            />
+          ))}
+        </>
+      ) : null}
     </Screen>
   );
 }

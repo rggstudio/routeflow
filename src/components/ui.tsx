@@ -75,7 +75,7 @@ export function SectionCard({ title, eyebrow, children, className }: SectionCard
 type StatTileProps = {
   label: string;
   value: string;
-  tone?: 'default' | 'positive' | 'warning';
+  tone?: 'default' | 'positive' | 'warning' | 'negative';
   style?: StyleProp<ViewStyle>;
   labelClassName?: string;
   valueClassName?: string;
@@ -96,13 +96,17 @@ export function StatTile({
       ? 'bg-emerald-500/15'
       : tone === 'warning'
         ? 'bg-amber-500/15'
-        : 'bg-white/5';
+        : tone === 'negative'
+          ? 'bg-rose-500/15'
+          : 'bg-white/5';
   const textColor =
     tone === 'positive'
       ? 'text-emerald-200'
       : tone === 'warning'
         ? 'text-amber-100'
-        : 'text-white';
+        : tone === 'negative'
+          ? 'text-rose-300'
+          : 'text-white';
 
   return (
     <View className={`min-w-[104px] flex-1 rounded-3xl px-4 py-4 ${background}`} style={style}>
