@@ -37,7 +37,8 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastQueryRef = useRef('');
   const suppressFetchRef = useRef(false);
-  // Set true on onPressIn so handleBlur knows not to clear suggestions yet.
+  // Tracks when the user's finger is down on a suggestion row so the blur
+  // timeout doesn't collapse the list before onPress fires.
   const isPressingSuggestionRef = useRef(false);
 
   const fetchSuggestions = useCallback(async (query: string) => {
@@ -197,19 +198,16 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
           {suggestions.map((suggestion, index) => (
             <Pressable
               key={suggestion.mapbox_id}
-              onPressIn={() => {
-                isPressingSuggestionRef.current = true;
-              }}
-              onPressOut={() => {
-                isPressingSuggestionRef.current = false;
-              }}
+              onPressIn={() => { isPressingSuggestionRef.current = true; }}
+              onPressOut={() => { isPressingSuggestionRef.current = false; }}
               onPress={() => void handleSelect(suggestion)}
-              className={`flex-row items-start gap-3 px-4 py-3 active:bg-white/10 ${
+              style={{ minHeight: 52 }}
+              className={`flex-row items-center gap-3 px-4 active:bg-white/10 ${
                 index < suggestions.length - 1 ? 'border-b border-white/5' : ''
               }`}
             >
-              <Ionicons name="location-outline" size={15} color="#67e8f9" style={{ marginTop: 2 }} />
-              <View className="flex-1">
+              <Ionicons name="location-outline" size={16} color="#67e8f9" />
+              <View className="flex-1 py-3">
                 <Text className="text-sm font-medium text-white" numberOfLines={1}>
                   {suggestion.name}
                 </Text>
