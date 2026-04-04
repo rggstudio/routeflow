@@ -43,11 +43,13 @@ export function RideDetailScreen({ navigation, route }: Props) {
     action: () => Promise<void>,
     successTitle: string,
     errorTitle: string,
-    successMessage?: string
+    successMessage?: string,
+    onSuccess?: () => void
   ) => {
     try {
       await action();
       showToast({ title: successTitle, message: successMessage });
+      onSuccess?.();
     } catch (error) {
       Alert.alert(errorTitle, error instanceof Error ? error.message : 'Try again.');
     }
@@ -222,7 +224,8 @@ export function RideDetailScreen({ navigation, route }: Props) {
                           () => cancelOccurrence(view.occurrence.id),
                           'Ride canceled',
                           'Cancel ride failed',
-                          `${view.group.riderName} was marked canceled.`
+                          `${view.group.riderName} was marked canceled.`,
+                          () => navigation.goBack()
                         ),
                     },
                   ])
@@ -245,7 +248,8 @@ export function RideDetailScreen({ navigation, route }: Props) {
                             () => cancelOccurrenceWithPay(view.occurrence.id),
                             'Ride canceled with pay',
                             'Cancel with pay failed',
-                            `${view.group.riderName} was canceled and payment was kept.`
+                            `${view.group.riderName} was canceled and payment was kept.`,
+                            () => navigation.goBack()
                           ),
                       },
                     ]
@@ -266,7 +270,8 @@ export function RideDetailScreen({ navigation, route }: Props) {
                           () => cancelSeries(view.group.id),
                           'Series canceled',
                           'Cancel series failed',
-                          `All scheduled rides for ${view.group.riderName} were canceled.`
+                          `All scheduled rides for ${view.group.riderName} were canceled.`,
+                          () => navigation.goBack()
                         ),
                     },
                   ])

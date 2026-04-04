@@ -530,13 +530,18 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
     async (occurrenceId: string, status: RideStatus) => {
       const { client } = requireSignedInClient();
 
-      const { error: occurrenceError } = await client
+      const { data: updatedOccurrences, error: occurrenceError } = await client
         .from('trip_occurrences')
         .update({ status })
-        .eq('id', occurrenceId);
+        .eq('id', occurrenceId)
+        .select('id');
 
       if (occurrenceError) {
-        throw occurrenceError;
+        throw new Error(occurrenceError.message ?? 'Failed to update ride status.');
+      }
+
+      if (!updatedOccurrences || updatedOccurrences.length === 0) {
+        throw new Error('Ride not found or you do not have permission to update it.');
       }
 
       const { error: legsError } = await client
@@ -545,7 +550,7 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
         .eq('trip_occurrence_id', occurrenceId);
 
       if (legsError) {
-        throw legsError;
+        throw new Error(legsError.message ?? 'Failed to update ride legs.');
       }
 
       await loadState();
