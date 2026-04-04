@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { summarizeWeeklyRides } from '@/lib/weeklyRideSummary';
 import { ActionButton, Screen, SectionCard, StatTile } from '@/components/ui';
-import { addDays, getFullDateLabel, getStartOfWeek, getWeekRangeLabel, toIsoDate } from '@/lib/date';
+import { addDays, formatTime, getFullDateLabel, getStartOfWeek, getWeekRangeLabel, toIsoDate } from '@/lib/date';
 import { getStatusLabel } from '@/lib/routeFlow';
 import { useRouteFlow } from '@/providers/RouteFlowProvider';
 import { RootStackParamList } from '@/types/navigation';
@@ -71,6 +72,11 @@ export function EarningsScreen({ navigation }: Props) {
   const [weekStart, setWeekStart] = useState(toIsoDate(thisWeek));
   const { getWeekMetrics } = useRouteFlow();
   const metrics = getWeekMetrics(weekStart);
+  const weeklySummaries = useMemo(() => summarizeWeeklyRides(metrics.rides), [metrics.rides]);
+  const completedRideCount = weeklySummaries.filter((ride) => ride.status === 'completed').length;
+  const canceledRideCount = weeklySummaries.filter(
+    (ride) => ride.status === 'canceled' || ride.status === 'canceled_paid'
+  ).length;
 
   return (
     <Screen>
@@ -112,14 +118,14 @@ export function EarningsScreen({ navigation }: Props) {
       <View className="mb-4 flex-row gap-3">
         <StatTile
           label="# of rides"
-          value={`${metrics.totalRides}`}
+          value={`${weeklySummaries.length}`}
           style={{ flex: 0.9 }}
           labelClassName="text-[9px] tracking-[1.2px]"
           valueClassName="text-[19px]"
         />
         <StatTile
           label="Completed"
-          value={`${metrics.completedRides}`}
+          value={`${completedRideCount}`}
           tone="positive"
           style={{ flex: 1.15 }}
           labelClassName="text-[9px] tracking-[1.2px]"
@@ -127,7 +133,7 @@ export function EarningsScreen({ navigation }: Props) {
         />
         <StatTile
           label="Canceled"
-          value={`${metrics.canceledRides}`}
+          value={`${canceledRideCount}`}
           tone="warning"
           labelClassName="text-[9px] tracking-[1.2px]"
           valueClassName="text-[19px]"
@@ -135,40 +141,46 @@ export function EarningsScreen({ navigation }: Props) {
       </View>
 
       <SectionCard title="Ride breakdown">
-        {metrics.rides.length > 0 ? (
-          metrics.rides.map((ride) => {
-            const styles = getRideBreakdownClasses(ride.occurrence.status);
-            const displayAmount = getRideDisplayAmount(ride.occurrence.status, ride.effectivePay);
+        {weeklySummaries.length > 0 ? (
+          weeklySummaries.map((ride) => {
+            const styles = getRideBreakdownClasses(ride.status);
+            const displayAmount = getRideDisplayAmount(ride.status, ride.totalAmount);
+            const timeLabel = ride.legTimes.map((time) => formatTime(time)).join(' / ');
 
             return (
               <View
-                key={ride.occurrence.id}
+                key={ride.key}
                 className={`mb-3 rounded-3xl border px-4 py-4 ${styles.container}`}
               >
                 <View className="flex-row items-start justify-between gap-4">
                   <View className="flex-1 pr-4">
                     <View className="flex-row items-center gap-1.5">
                       <Ionicons name="person-circle-outline" size={15} color="#94a3b8" />
-                      <Text className="font-semibold text-white">{ride.group.riderName}</Text>
+                      <Text className="font-semibold text-white">{ride.riderName}</Text>
                     </View>
                     <View className="mt-1 flex-row items-center gap-1.5">
                       <Ionicons name="time-outline" size={13} color="#64748b" />
                       <Text className="text-sm text-slate-400">
-                        {getFullDateLabel(ride.occurrence.serviceDate)} at {ride.outboundLeg.pickupTime}
+                        {getFullDateLabel(ride.serviceDate)} at {timeLabel}
                       </Text>
                     </View>
                   </View>
                   <View className={`rounded-full px-3 py-1 ${styles.statusPill}`}>
                     <Text className={`text-xs font-semibold uppercase tracking-[1.4px] ${styles.statusText}`}>
-                      {getStatusLabel(ride.occurrence.status)}
+                      {getStatusLabel(ride.status)}
                     </Text>
                   </View>
                 </View>
-                <View className="mt-4 flex-row items-center justify-end gap-1">
-                  <Ionicons name="cash-outline" size={14} color="#a5f3fc" />
-                  <Text className={`text-base font-semibold ${styles.amount}`}>
-                    ${displayAmount.toFixed(2)}
+                <View className="mt-4 flex-row items-center justify-between">
+                  <Text className="text-sm text-slate-400">
+                    {ride.rideCount > 1 ? `${ride.rideCount} legs` : '1 leg'}
                   </Text>
+                  <View className="flex-row items-center gap-1">
+                    <Ionicons name="cash-outline" size={14} color="#a5f3fc" />
+                    <Text className={`text-base font-semibold ${styles.amount}`}>
+                      ${displayAmount.toFixed(2)}
+                    </Text>
+                  </View>
                 </View>
               </View>
             );

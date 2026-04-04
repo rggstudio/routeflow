@@ -70,13 +70,13 @@ function HomeRideSpotlight({
           <View className="h-6 justify-center">
             <Ionicons name="location-outline" size={15} color="#bbf7d0" />
           </View>
-          <Text className="flex-1 text-sm leading-6 text-slate-100">{ride.outboundLeg.pickupAddress}</Text>
+          <Text className="flex-1 text-sm leading-6 text-slate-100">{ride.activeLeg.pickupAddress}</Text>
         </View>
         <View className="flex-row gap-2">
           <View className="h-6 justify-center">
             <Ionicons name="flag-outline" size={15} color="#dcfce7" />
           </View>
-          <Text className="flex-1 text-sm leading-6 text-emerald-100/90">{ride.outboundLeg.dropoffAddress}</Text>
+          <Text className="flex-1 text-sm leading-6 text-emerald-100/90">{ride.activeLeg.dropoffAddress}</Text>
         </View>
       </View>
 
@@ -170,7 +170,9 @@ export function TodayScreen({ navigation }: Props) {
         ride.occurrence.id !== inProgressRide?.occurrence.id
     ) ?? null;
   const todaysRideLabel = todaysRides.length === 1 ? 'ride' : 'rides';
-  const laterTodayRides = todaysRides.filter((ride) => ride.occurrence.status !== 'completed');
+  const laterTodayRides = todaysRides.filter(
+    (ride) => ride.occurrence.status !== 'completed' && ride.occurrence.status !== 'in_progress'
+  );
   const completedTodayRides = todaysRides.filter((ride) => ride.occurrence.status === 'completed');
 
   useEffect(() => {
@@ -211,7 +213,7 @@ export function TodayScreen({ navigation }: Props) {
           ride={inProgressRide}
           statusTone="in_progress"
           eyebrow="In progress"
-          title={`${inProgressRide.group.riderName} - ${formatTime(inProgressRide.outboundLeg.pickupTime)}`}
+          title={`${inProgressRide.group.riderName} - ${formatTime(inProgressRide.activeLeg.pickupTime)}`}
           today={today}
           todaysRides={todaysRides}
           onNavigate={() => openNavigation(inProgressRide, state.preferences)}
@@ -227,8 +229,8 @@ export function TodayScreen({ navigation }: Props) {
       {nextRide ? (
         <HomeRideSpotlight
           ride={nextRide}
-          eyebrow={getNextRideEyebrow(nextRide.occurrence.serviceDate, nextRide.outboundLeg.pickupTime, now)}
-          title={`${nextRide.group.riderName} - ${formatTime(nextRide.outboundLeg.pickupTime)}`}
+          eyebrow={getNextRideEyebrow(nextRide.occurrence.serviceDate, nextRide.activeLeg.pickupTime, now)}
+          title={`${nextRide.group.riderName} - ${formatTime(nextRide.activeLeg.pickupTime)}`}
           today={today}
           todaysRides={todaysRides}
           onNavigate={() => openNavigation(nextRide, state.preferences)}

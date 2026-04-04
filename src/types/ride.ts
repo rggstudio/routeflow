@@ -45,6 +45,7 @@ export type TripLeg = {
 export type DriverProfile = {
   name: string;
   phone: string;
+  avatarUrl: string;
 };
 
 export type DriverPreferences = {
@@ -80,7 +81,7 @@ export type RideOccurrenceView = {
   occurrence: TripOccurrence;
   group: TripGroup;
   legs: TripLeg[];
-  outboundLeg: TripLeg;
-  returnLeg: TripLeg | null;
+  activeLeg: TripLeg;
+  pairedLeg: TripLeg | null;
   effectivePay: number;
 };

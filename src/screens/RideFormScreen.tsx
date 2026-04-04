@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, ScrollView, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import { BottomSheetScreen } from '@/components/BottomSheetScreen';
 // React Native resolves this to `.native` or `.web` at runtime.
 import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
@@ -11,6 +12,13 @@ import { useRouteFlow } from '@/providers/RouteFlowProvider';
 import { useToast } from '@/providers/ToastProvider';
 import { RootStackParamList } from '@/types/navigation';
 import { RecurrenceType, RideDraft, TripType } from '@/types/ride';
+
+function makeSessionToken() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.floor(Math.random() * 16);
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RideForm'>;
 
@@ -54,6 +62,7 @@ export function RideFormScreen({ navigation, route }: Props) {
   const isEditing = Boolean(route.params?.groupId);
   const [activePicker, setActivePicker] = useState<ActivePicker>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const sessionToken = useMemo(() => makeSessionToken(), []);
   const [draft, setDraft] = useState<RideDraft>(
     createDraftForGroup(route.params?.groupId) ?? {
       riderName: '',
@@ -256,15 +265,17 @@ export function RideFormScreen({ navigation, route }: Props) {
             icon="calendar-outline"
             onPress={() => openPicker('serviceDate')}
           />
-          <InputField
+          <AddressAutocomplete
             label="Pickup address"
             value={draft.pickupAddress}
             onChangeText={(value) => setField('pickupAddress', value)}
+            sessionToken={sessionToken}
           />
-          <InputField
+          <AddressAutocomplete
             label="Dropoff address"
             value={draft.dropoffAddress}
             onChangeText={(value) => setField('dropoffAddress', value)}
+            sessionToken={sessionToken}
           />
           <SelectField
             label="Pickup time"
@@ -281,11 +292,12 @@ export function RideFormScreen({ navigation, route }: Props) {
                 icon="time-outline"
                 onPress={() => openPicker('returnPickupTime')}
               />
-              <InputField
+              <AddressAutocomplete
                 label="Return dropoff address"
                 value={draft.returnDropoffAddress}
                 onChangeText={(value) => setField('returnDropoffAddress', value)}
                 placeholder="Defaults to original pickup"
+                sessionToken={sessionToken}
               />
             </>
           ) : null}

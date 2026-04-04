@@ -1,13 +1,14 @@
 import { Image, Pressable, Text, View } from 'react-native';
 import { useEffect, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import Constants from 'expo-constants';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { AuthFormCard } from '@/components/AuthFormCard';
 import { Screen } from '@/components/ui';
 import { RootStackParamList } from '@/types/navigation';
 
-const appVersion = require('../../app.json').expo.version as string;
+const appVersion = (Constants.expoConfig?.version ?? '1.0.0') as string;
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Auth'>;
 type AuthMode = 'sign_in' | 'sign_up';

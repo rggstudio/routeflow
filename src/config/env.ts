@@ -1,5 +1,8 @@
+import Constants from 'expo-constants';
+
 const rawSupabaseUrl = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? '').trim();
 const rawSupabaseAnonKey = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
+const rawMapboxKey = ((Constants.expoConfig?.extra?.mapboxKey as string) ?? '').trim();
 
 const isValidUrl = (url: string) => {
   try {
@@ -16,4 +19,6 @@ export const env = {
   supabaseUrl: rawSupabaseUrl,
   supabaseAnonKey: rawSupabaseAnonKey,
   isSupabaseConfigured: Boolean(rawSupabaseUrl && rawSupabaseAnonKey && urlValid),
+  mapboxKey: rawMapboxKey,
+  isMapboxConfigured: Boolean(rawMapboxKey),
 };

@@ -67,6 +67,15 @@ export function RideDetailScreen({ navigation, route }: Props) {
     );
   }
 
+  const legTitle =
+    view.group.tripType === 'round_trip'
+      ? view.activeLeg.legType === 'return'
+        ? 'Return leg'
+        : 'Outbound leg'
+      : 'Single trip';
+  const pairedLabel =
+    view.pairedLeg?.legType === 'return' ? 'Paired return' : 'Paired outbound';
+
   return (
     <BottomSheetScreen onClose={() => navigation.goBack()}>
       <View>
@@ -77,16 +86,19 @@ export function RideDetailScreen({ navigation, route }: Props) {
             </Text>
             <Text className="mt-2 text-4xl font-semibold text-white">{view.group.riderName}</Text>
             <Text className="mt-3 text-base leading-7 text-slate-300">
-              {getLongDateLabel(view.occurrence.serviceDate)}.{' '}
-              {view.group.tripType === 'round_trip' ? 'Round trip' : 'Single trip'}.
+              {getLongDateLabel(view.occurrence.serviceDate)}. {legTitle}.
             </Text>
           </View>
 
           <SectionCard title="Route">
             <View className="flex-row items-center gap-1.5">
-              <Ionicons name="arrow-up-circle-outline" size={14} color="#67e8f9" />
+              <Ionicons
+                name={view.activeLeg.legType === 'return' ? 'arrow-down-circle-outline' : 'arrow-up-circle-outline'}
+                size={14}
+                color="#67e8f9"
+              />
               <Text className="text-sm font-semibold uppercase tracking-[1.5px] text-slate-400">
-                Pick-up
+                {view.activeLeg.legType === 'return' ? 'Return' : 'Pick-up'}
               </Text>
             </View>
             <View className="mt-2 flex-row gap-2">
@@ -94,37 +106,37 @@ export function RideDetailScreen({ navigation, route }: Props) {
                 <Ionicons name="location-outline" size={15} color="#67e8f9" />
               </View>
               <Text className="flex-1 text-base text-white">
-                {formatTime(view.outboundLeg.pickupTime)} — {view.outboundLeg.pickupAddress}
+                {formatTime(view.activeLeg.pickupTime)} — {view.activeLeg.pickupAddress}
               </Text>
             </View>
             <View className="mt-1 flex-row gap-2">
               <View className="h-5 justify-center">
                 <Ionicons name="flag-outline" size={15} color="#94a3b8" />
               </View>
-              <Text className="flex-1 text-sm text-slate-400">{view.outboundLeg.dropoffAddress}</Text>
+              <Text className="flex-1 text-sm text-slate-400">{view.activeLeg.dropoffAddress}</Text>
             </View>
 
-            {view.returnLeg ? (
+            {view.pairedLeg ? (
               <View className="mt-5">
                 <View className="flex-row items-center gap-1.5">
-                  <Ionicons name="arrow-down-circle-outline" size={14} color="#94a3b8" />
+                  <Ionicons name="swap-horizontal-outline" size={14} color="#94a3b8" />
                   <Text className="text-sm font-semibold uppercase tracking-[1.5px] text-slate-400">
-                    Return
+                    {pairedLabel}
                   </Text>
                 </View>
                 <View className="mt-2 flex-row gap-2">
                   <View className="h-5 justify-center">
-                    <Ionicons name="location-outline" size={15} color="#67e8f9" />
+                    <Ionicons name="time-outline" size={15} color="#67e8f9" />
                   </View>
                   <Text className="flex-1 text-base text-white">
-                    {formatTime(view.returnLeg.pickupTime)} — {view.returnLeg.pickupAddress}
+                    {formatTime(view.pairedLeg.pickupTime)} — {view.pairedLeg.pickupAddress}
                   </Text>
                 </View>
                 <View className="mt-1 flex-row gap-2">
                   <View className="h-5 justify-center">
                     <Ionicons name="flag-outline" size={15} color="#94a3b8" />
                   </View>
-                  <Text className="flex-1 text-sm text-slate-400">{view.returnLeg.dropoffAddress}</Text>
+                  <Text className="flex-1 text-sm text-slate-400">{view.pairedLeg.dropoffAddress}</Text>
                 </View>
               </View>
             ) : null}

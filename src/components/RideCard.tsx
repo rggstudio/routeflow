@@ -22,6 +22,17 @@ export function RideCard({
   const isCanceled = ride.occurrence.status === 'canceled' || ride.occurrence.status === 'canceled_paid';
   const isCompleted = ride.occurrence.status === 'completed';
   const isScheduled = ride.occurrence.status === 'scheduled';
+  const legLabel =
+    ride.group.tripType === 'round_trip'
+      ? ride.activeLeg.legType === 'return'
+        ? 'Return leg'
+        : 'Outbound leg'
+      : 'Single trip';
+  const pairedLabel = ride.pairedLeg
+    ? ride.pairedLeg.legType === 'return'
+      ? 'Paired return'
+      : 'Paired outbound'
+    : null;
 
   const cardClasses = isWeeklyStyle
     ? isCanceled
@@ -68,7 +79,7 @@ export function RideCard({
           <View className="mt-1 flex-row items-center gap-1.5">
             <Ionicons name="time-outline" size={13} color="#64748b" />
             <Text className="text-sm text-slate-400">
-              {getLongDateLabel(ride.occurrence.serviceDate)} at {formatTime(ride.outboundLeg.pickupTime)}
+              {getLongDateLabel(ride.occurrence.serviceDate)} at {formatTime(ride.activeLeg.pickupTime)}
             </Text>
           </View>
         </View>
@@ -85,7 +96,7 @@ export function RideCard({
             <Ionicons name="location-outline" size={14} color="#67e8f9" />
           </View>
           <Text className="flex-1 text-sm leading-6 text-slate-300">
-            {ride.outboundLeg.pickupAddress}
+            {ride.activeLeg.pickupAddress}
           </Text>
         </View>
         <View className="flex-row gap-1.5">
@@ -93,18 +104,18 @@ export function RideCard({
             <Ionicons name="flag-outline" size={14} color="#94a3b8" />
           </View>
           <Text className="flex-1 text-sm leading-6 text-slate-400">
-            {ride.outboundLeg.dropoffAddress}
+            {ride.activeLeg.dropoffAddress}
           </Text>
         </View>
       </View>
 
-      {ride.returnLeg ? (
+      {ride.pairedLeg && pairedLabel ? (
         <View className="mt-2 flex-row gap-1.5">
           <View className="h-6 justify-center">
-            <Ionicons name="repeat-outline" size={14} color="#64748b" />
+            <Ionicons name="swap-horizontal-outline" size={14} color="#64748b" />
           </View>
           <Text className="flex-1 text-sm leading-6 text-slate-400">
-            Return at {formatTime(ride.returnLeg.pickupTime)} → {ride.returnLeg.dropoffAddress}
+            {pairedLabel} at {formatTime(ride.pairedLeg.pickupTime)} → {ride.pairedLeg.dropoffAddress}
           </Text>
         </View>
       ) : null}
@@ -116,9 +127,7 @@ export function RideCard({
             size={13}
             color="#64748b"
           />
-          <Text className="text-sm text-slate-400">
-            {ride.group.tripType === 'round_trip' ? 'Round trip' : 'Single trip'}
-          </Text>
+          <Text className="text-sm text-slate-400">{legLabel}</Text>
         </View>
         <View className="flex-row items-center gap-1">
           <Ionicons name="cash-outline" size={14} color="#a5f3fc" />

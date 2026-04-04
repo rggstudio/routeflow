@@ -6,15 +6,14 @@ import { captureRef } from 'react-native-view-shot';
 
 import { BottomSheetScreen } from '@/components/BottomSheetScreen';
 import { ActionButton, PillButton, SectionCard } from '@/components/ui';
-import { getFullDateLabel, getWeekRangeLabel } from '@/lib/date';
+import { formatTime, getFullDateLabel, getWeekRangeLabel } from '@/lib/date';
 import { getStatusLabel, shareReport } from '@/lib/routeFlow';
+import { summarizeWeeklyRides } from '@/lib/weeklyRideSummary';
 import { useRouteFlow } from '@/providers/RouteFlowProvider';
 import { RootStackParamList } from '@/types/navigation';
 import { RideStatus } from '@/types/ride';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WeeklyReport'>;
-type WeekMetrics = ReturnType<ReturnType<typeof useRouteFlow>['getWeekMetrics']>;
-
 type BackgroundOption = {
   id: string;
   name: string;
@@ -142,17 +141,17 @@ function getRideSummaryStyles(status: RideStatus) {
   };
 }
 
-function buildReportText(name: string, weekStart: string, metrics: WeekMetrics) {
+function buildReportText(name: string, weekStart: string, weeklySummaries: ReturnType<typeof summarizeWeeklyRides>) {
   const lines = [
     `RouteFlow Weekly Report for Driver: ${name}`,
     `Week: ${getWeekRangeLabel(weekStart)}`,
-    `Total Earnings: $${metrics.totalEarnings.toFixed(2)}`,
-    `Total Rides: ${metrics.totalRides}`,
+    `Total Earnings: ${weeklySummaries.reduce((sum, ride) => sum + ride.totalAmount, 0).toFixed(2)}`,
+    `Total Rides: ${weeklySummaries.length}`,
     '',
     'Breakdown of rides:',
-    ...metrics.rides.map(
+    ...weeklySummaries.map(
       (ride) =>
-        `${getMonthDayCode(ride.occurrence.serviceDate)} | ${ride.group.riderName} | ${getStatusLabel(ride.occurrence.status)} | $${getRideDisplayAmount(ride.occurrence.status, ride.effectivePay).toFixed(2)}`
+        `${getMonthDayCode(ride.serviceDate)} | ${ride.riderName} | ${getStatusLabel(ride.status)} | ${getRideDisplayAmount(ride.status, ride.totalAmount).toFixed(2)}`
     ),
   ];
 
@@ -167,14 +166,15 @@ export function WeeklyReportScreen({ navigation, route }: Props) {
     () => BACKGROUND_OPTIONS[Math.floor(Math.random() * BACKGROUND_OPTIONS.length)]?.id ?? 'glacier'
   );
   const [isSharingImage, setIsSharingImage] = useState(false);
-  const reportText = buildReportText(state.profile.name, route.params.weekStart, metrics);
+  const weeklySummaries = useMemo(() => summarizeWeeklyRides(metrics.rides), [metrics.rides]);
+  const reportText = buildReportText(state.profile.name, route.params.weekStart, weeklySummaries);
   const driverName = state.profile.name.trim() || 'RouteFlow Driver';
   const selectedBackground =
     BACKGROUND_OPTIONS.find((option) => option.id === selectedBackgroundId) ?? BACKGROUND_OPTIONS[0];
   const avatarInitials = useMemo(() => getInitials(driverName), [driverName]);
   const imagePreviewRides = useMemo(
-    () => metrics.rides.filter((ride) => getRideDisplayAmount(ride.occurrence.status, ride.effectivePay) > 0),
-    [metrics.rides]
+    () => weeklySummaries.filter((ride) => getRideDisplayAmount(ride.status, ride.totalAmount) > 0),
+    [weeklySummaries]
   );
 
   const handleShareImage = async () => {
@@ -232,31 +232,31 @@ export function WeeklyReportScreen({ navigation, route }: Props) {
             <View>
               <Text className="text-sm uppercase tracking-[1.5px] text-slate-400">Total rides</Text>
               <Text className="mt-2 text-right text-3xl font-semibold text-cyan-200">
-                {metrics.totalRides}
+                {weeklySummaries.length}
               </Text>
             </View>
           </View>
 
-          {metrics.rides.length > 0 ? (
-            metrics.rides.map((ride) => {
-              const styles = getRideSummaryStyles(ride.occurrence.status);
-              const displayAmount = getRideDisplayAmount(ride.occurrence.status, ride.effectivePay);
+          {weeklySummaries.length > 0 ? (
+            weeklySummaries.map((ride) => {
+              const styles = getRideSummaryStyles(ride.status);
+              const displayAmount = getRideDisplayAmount(ride.status, ride.totalAmount);
 
               return (
                 <View
-                  key={ride.occurrence.id}
+                  key={ride.key}
                   className={`mb-3 rounded-3xl border px-4 py-4 ${styles.card}`}
                 >
                   <View className="flex-row items-start justify-between gap-4">
                     <View className="flex-1 pr-4">
-                      <Text className="font-semibold text-white">{ride.group.riderName}</Text>
+                      <Text className="font-semibold text-white">{ride.riderName}</Text>
                       <Text className="mt-1 text-sm text-slate-400">
-                        {getFullDateLabel(ride.occurrence.serviceDate)}
+                        {getFullDateLabel(ride.serviceDate)}{ride.rideCount > 1 ? ` • ${ride.legTimes.map((time) => formatTime(time)).join(' / ')}` : ''}
                       </Text>
                     </View>
                     <View className={`rounded-full px-3 py-1 ${styles.pill}`}>
                       <Text className={`text-xs font-semibold uppercase tracking-[1.4px] ${styles.pillText}`}>
-                        {getStatusLabel(ride.occurrence.status)}
+                        {getStatusLabel(ride.status)}
                       </Text>
                     </View>
                   </View>
@@ -432,7 +432,7 @@ export function WeeklyReportScreen({ navigation, route }: Props) {
                       marginTop: 4,
                     }}
                   >
-                    Total Rides: {metrics.totalRides}
+                    Total Rides: {weeklySummaries.length}
                   </Text>
                 </View>
 
@@ -450,7 +450,7 @@ export function WeeklyReportScreen({ navigation, route }: Props) {
                 {imagePreviewRides.length > 0 ? (
                   imagePreviewRides.map((ride) => (
                     <View
-                      key={ride.occurrence.id}
+                      key={ride.key}
                       style={{
                         marginBottom: 8,
                         borderRadius: 18,
@@ -467,8 +467,8 @@ export function WeeklyReportScreen({ navigation, route }: Props) {
                           lineHeight: 18,
                         }}
                       >
-                        {getMonthDayCode(ride.occurrence.serviceDate)} | {ride.group.riderName} | $
-                        {getRideDisplayAmount(ride.occurrence.status, ride.effectivePay).toFixed(2)}
+                        {getMonthDayCode(ride.serviceDate)} | {ride.riderName} | {ride.rideCount > 1 ? `${ride.rideCount} legs` : '1 leg'} | $
+                        {getRideDisplayAmount(ride.status, ride.totalAmount).toFixed(2)}
                       </Text>
                     </View>
                   ))

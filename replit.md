@@ -16,7 +16,7 @@ A mobile-first application for independent transportation drivers to manage ride
 ```
 ├── App.tsx               # Root component
 ├── index.ts              # App registration
-├── app.json              # Expo configuration
+├── app.config.js         # Expo configuration (replaces app.json; exposes MAPBOX_PUBLIC_KEY via extra)
 ├── src/
 │   ├── components/       # Reusable UI components
 │   ├── config/           # Environment variable management (env.ts)
@@ -44,12 +44,19 @@ npx expo start --web --port 5000
 Requires Supabase credentials (optional - app gracefully handles missing config):
 - `EXPO_PUBLIC_SUPABASE_URL` - Your Supabase project URL
 - `EXPO_PUBLIC_SUPABASE_ANON_KEY` - Your Supabase anonymous key
+- `MAPBOX_PUBLIC_KEY` - Mapbox token for address autocomplete (accessed via `Constants.expoConfig.extra.mapboxKey`)
 
 ## Key Features
 
 - **Today Screen**: Daily command center for drivers
 - **Week Screen**: Weekly schedule overview
 - **Earnings & Reports**: Track income and generate shareable weekly reports
-- **Ride Management**: Support for one-time and recurring rides
+- **Ride Management**: Support for one-time and recurring rides with address autocomplete (Mapbox Search Box API)
 - **Deep Linking**: Integration with Waze, Google Maps, and Apple Maps
 - **Authentication**: Email/password and Google OAuth via Supabase
+
+## Notable Implementation Notes
+
+- `app.config.js` replaces `app.json` (deleted). All version/version reads use `Constants.expoConfig` rather than `require('../../app.json')`.
+- `AddressAutocomplete` component (`src/components/AddressAutocomplete.tsx`) uses Mapbox `/suggest` + `/retrieve` endpoints with 300 ms debounce and a per-form-session UUID token.
+- DB audit trigger bug fix: `supabase/migrations/202604030001_fix_audit_fk_on_delete.sql` must be applied via Supabase SQL Editor (sets FK to NULL on delete so audit triggers don't reference already-deleted rows).

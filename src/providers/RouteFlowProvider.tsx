@@ -86,6 +86,7 @@ function createEmptyState(fallbackName = ''): RouteFlowState {
     profile: {
       name: fallbackName,
       phone: '',
+      avatarUrl: '',
     },
     preferences: {
       defaultNavigationApp: 'google_maps',
@@ -101,6 +102,7 @@ function mapProfile(profile: ProfileRow | null, fallbackName = ''): DriverProfil
   return {
     name: profile?.full_name ?? fallbackName,
     phone: profile?.phone ?? '',
+    avatarUrl: profile?.avatar_url ?? '',
   };
 }
 
@@ -152,6 +154,17 @@ function mapTripLegs(rows: TripLegRow[]): TripLeg[] {
   }));
 }
 
+function splitRoundTripPay(totalAmount: number) {
+  const totalCents = Math.round(totalAmount * 100);
+  const outboundCents = Math.floor(totalCents / 2);
+  const returnCents = totalCents - outboundCents;
+
+  return {
+    outbound: outboundCents / 100,
+    return: returnCents / 100,
+  };
+}
+
 function getSortedViews(state: RouteFlowState) {
   const groupMap = new Map(state.tripGroups.map((group) => [group.id, group]));
   const legsByOccurrence = new Map<string, TripLeg[]>();
@@ -162,7 +175,7 @@ function getSortedViews(state: RouteFlowState) {
     legsByOccurrence.set(leg.tripOccurrenceId, current);
   }
 
-  return state.tripOccurrences
+  const baseViews = state.tripOccurrences
     .map((occurrence) => {
       const group = groupMap.get(occurrence.tripGroupId);
 
@@ -173,25 +186,57 @@ function getSortedViews(state: RouteFlowState) {
       const legs = [...(legsByOccurrence.get(occurrence.id) ?? [])].sort((a, b) =>
         compareTime(a.pickupTime, b.pickupTime)
       );
-      const outboundLeg = legs.find((leg) => leg.legType === 'outbound');
+      const activeLeg = legs[0];
 
-      if (!outboundLeg) {
+      if (!activeLeg) {
         return null;
       }
+
+      const splitPay = splitRoundTripPay(group.payAmount);
+      const effectivePay =
+        occurrence.overridePayAmount ??
+        (group.tripType === 'round_trip' && legs.length === 1
+          ? splitPay[activeLeg.legType]
+          : group.payAmount);
 
       return {
         occurrence,
         group,
         legs,
-        outboundLeg,
-        returnLeg: legs.find((leg) => leg.legType === 'return') ?? null,
-        effectivePay: occurrence.overridePayAmount ?? group.payAmount,
+        activeLeg,
+        pairedLeg: null,
+        effectivePay,
       };
     })
-    .filter((view): view is RideOccurrenceView => view !== null)
+    .filter((view): view is RideOccurrenceView => view !== null);
+
+  return baseViews
+    .map((view) => {
+      const pairedLegFromSameOccurrence = view.legs.find((leg) => leg.id !== view.activeLeg.id) ?? null;
+
+      if (pairedLegFromSameOccurrence) {
+        return {
+          ...view,
+          pairedLeg: pairedLegFromSameOccurrence,
+        };
+      }
+
+      const pairedView = baseViews.find(
+        (candidate) =>
+          candidate.occurrence.id !== view.occurrence.id &&
+          candidate.group.id === view.group.id &&
+          candidate.occurrence.serviceDate === view.occurrence.serviceDate &&
+          candidate.activeLeg.legType !== view.activeLeg.legType
+      );
+
+      return {
+        ...view,
+        pairedLeg: pairedView?.activeLeg ?? null,
+      };
+    })
     .sort((a, b) => {
       if (a.occurrence.serviceDate === b.occurrence.serviceDate) {
-        return compareTime(a.outboundLeg.pickupTime, b.outboundLeg.pickupTime);
+        return compareTime(a.activeLeg.pickupTime, b.activeLeg.pickupTime);
       }
 
       return a.occurrence.serviceDate.localeCompare(b.occurrence.serviceDate);
@@ -224,6 +269,7 @@ function buildInsertPayload(draft: RideDraft, driverId: string, existingGroupId?
   validateDraft(draft);
 
   const groupId = existingGroupId ?? createUuid();
+  const payAmount = Number(draft.payAmount || '0');
   const recurrenceDays =
     draft.recurrenceType === 'weekday'
       ? getDefaultWeekdays()
@@ -237,7 +283,7 @@ function buildInsertPayload(draft: RideDraft, driverId: string, existingGroupId?
     rider_name: draft.riderName.trim(),
     phone: draft.phone.trim(),
     trip_type: draft.tripType,
-    pay_amount: Number(draft.payAmount || '0'),
+    pay_amount: payAmount,
     recurrence_type: draft.recurrenceType,
     recurrence_days: recurrenceDays,
     notes: draft.notes.trim(),
@@ -263,20 +309,21 @@ function buildInsertPayload(draft: RideDraft, driverId: string, existingGroupId?
 
   const occurrences: TablesInsert<'trip_occurrences'>[] = [];
   const legs: TablesInsert<'trip_legs'>[] = [];
+  const splitPay = splitRoundTripPay(payAmount);
 
   for (const serviceDate of dates) {
-    const occurrenceId = createUuid();
+    const outboundOccurrenceId = createUuid();
     occurrences.push({
-      id: occurrenceId,
+      id: outboundOccurrenceId,
       trip_group_id: groupId,
       service_date: serviceDate,
       status: 'scheduled',
-      override_pay_amount: null,
+      override_pay_amount: draft.tripType === 'round_trip' ? splitPay.outbound : null,
     });
 
     legs.push({
       id: createUuid(),
-      trip_occurrence_id: occurrenceId,
+      trip_occurrence_id: outboundOccurrenceId,
       leg_type: 'outbound',
       pickup_address: draft.pickupAddress.trim(),
       dropoff_address: draft.dropoffAddress.trim(),
@@ -285,9 +332,18 @@ function buildInsertPayload(draft: RideDraft, driverId: string, existingGroupId?
     });
 
     if (draft.tripType === 'round_trip') {
+      const returnOccurrenceId = createUuid();
+      occurrences.push({
+        id: returnOccurrenceId,
+        trip_group_id: groupId,
+        service_date: serviceDate,
+        status: 'scheduled',
+        override_pay_amount: splitPay.return,
+      });
+
       legs.push({
         id: createUuid(),
-        trip_occurrence_id: occurrenceId,
+        trip_occurrence_id: returnOccurrenceId,
         leg_type: 'return',
         pickup_address: draft.dropoffAddress.trim(),
         dropoff_address: draft.returnDropoffAddress.trim() || draft.pickupAddress.trim(),
@@ -318,25 +374,59 @@ function createDefaultDraft(): RideDraft {
   };
 }
 
-function createDraftFromView(view?: RideOccurrenceView): RideDraft {
-  if (!view) {
+function createDraftFromGroup(state: RouteFlowState, groupId?: string): RideDraft {
+  if (!groupId) {
+    return createDefaultDraft();
+  }
+
+  const group = state.tripGroups.find((item) => item.id === groupId);
+
+  if (!group) {
+    return createDefaultDraft();
+  }
+
+  const legsByOccurrence = new Map<string, TripLeg[]>();
+
+  for (const leg of state.tripLegs) {
+    const current = legsByOccurrence.get(leg.tripOccurrenceId) ?? [];
+    current.push(leg);
+    legsByOccurrence.set(leg.tripOccurrenceId, current);
+  }
+
+  const legEntries = state.tripOccurrences
+    .filter((occurrence) => occurrence.tripGroupId === groupId)
+    .flatMap((occurrence) =>
+      (legsByOccurrence.get(occurrence.id) ?? []).map((leg) => ({ occurrence, leg }))
+    )
+    .sort((a, b) => {
+      if (a.occurrence.serviceDate === b.occurrence.serviceDate) {
+        return compareTime(a.leg.pickupTime, b.leg.pickupTime);
+      }
+
+      return a.occurrence.serviceDate.localeCompare(b.occurrence.serviceDate);
+    });
+
+  const outboundEntry = legEntries.find((entry) => entry.leg.legType === 'outbound') ?? legEntries[0];
+  const returnEntry = legEntries.find((entry) => entry.leg.legType === 'return');
+
+  if (!outboundEntry) {
     return createDefaultDraft();
   }
 
   return {
-    riderName: view.group.riderName,
-    phone: view.group.phone,
-    tripType: view.group.tripType,
-    pickupAddress: view.outboundLeg.pickupAddress,
-    dropoffAddress: view.outboundLeg.dropoffAddress,
-    pickupTime: view.outboundLeg.pickupTime,
-    returnPickupTime: view.returnLeg?.pickupTime ?? '15:00',
-    returnDropoffAddress: view.returnLeg?.dropoffAddress ?? view.outboundLeg.pickupAddress,
-    payAmount: `${view.group.payAmount}`,
-    recurrenceType: view.group.recurrenceType,
-    recurrenceDays: view.group.recurrenceDays,
-    serviceDate: view.occurrence.serviceDate,
-    notes: view.group.notes,
+    riderName: group.riderName,
+    phone: group.phone,
+    tripType: group.tripType,
+    pickupAddress: outboundEntry.leg.pickupAddress,
+    dropoffAddress: outboundEntry.leg.dropoffAddress,
+    pickupTime: outboundEntry.leg.pickupTime,
+    returnPickupTime: returnEntry?.leg.pickupTime ?? '15:00',
+    returnDropoffAddress: returnEntry?.leg.dropoffAddress ?? outboundEntry.leg.pickupAddress,
+    payAmount: String(group.payAmount),
+    recurrenceType: group.recurrenceType,
+    recurrenceDays: group.recurrenceDays,
+    serviceDate: outboundEntry.occurrence.serviceDate,
+    notes: group.notes,
   };
 }
 
@@ -500,12 +590,11 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
             return false;
           }
 
-          return combineDateAndTime(ride.occurrence.serviceDate, ride.outboundLeg.pickupTime) >= now;
+          return combineDateAndTime(ride.occurrence.serviceDate, ride.activeLeg.pickupTime) >= now;
         });
       },
       getWeekMetrics: (weekStartIso) => getWeekMetrics(weekStartIso, sortedViews),
-      createDraftForGroup: (groupId) =>
-        createDraftFromView(sortedViews.find((ride) => ride.group.id === groupId)),
+      createDraftForGroup: (groupId) => createDraftFromGroup(state, groupId),
       addRide: async (draft) => {
         const { client, userId } = requireSignedInClient();
         const payload = buildInsertPayload(draft, userId);
@@ -625,15 +714,39 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
       },
       updateProfile: async (profile) => {
         const { client, userId } = requireSignedInClient();
-
-        const { error } = await client.from('profiles').upsert({
-          id: userId,
+        const payload: {
+          full_name: string | null;
+          phone: string | null;
+          avatar_url?: string | null;
+        } = {
           full_name: profile.name.trim() || null,
           phone: profile.phone.trim() || null,
-        });
+        };
 
-        if (error) {
-          throw error;
+        if (profile.avatarUrl.trim()) {
+          payload.avatar_url = profile.avatarUrl.trim();
+        }
+
+        const { data: updatedProfile, error: updateError } = await client
+          .from('profiles')
+          .update(payload)
+          .eq('id', userId)
+          .select('id')
+          .maybeSingle();
+
+        if (updateError) {
+          throw new Error(updateError.message);
+        }
+
+        if (!updatedProfile) {
+          const { error: insertError } = await client.from('profiles').insert({
+            id: userId,
+            ...payload,
+          });
+
+          if (insertError) {
+            throw new Error(insertError.message);
+          }
         }
 
         setState((current) => ({ ...current, profile }));

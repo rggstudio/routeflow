@@ -24,8 +24,8 @@ export function getStatusLabel(status: RideStatus) {
 }
 
 export async function openNavigation(view: RideOccurrenceView, preferences: DriverPreferences) {
-  const origin = view.outboundLeg.pickupAddress;
-  const destination = view.outboundLeg.dropoffAddress;
+  const origin = view.activeLeg.pickupAddress;
+  const destination = view.activeLeg.dropoffAddress;
 
   const urls: Record<NavigationApp, string> = {
     waze: `https://waze.com/ul?ll=${encode(destination)}&navigate=yes`,
@@ -77,7 +77,7 @@ export function buildQuickMessage(type: 'on_my_way' | 'five_min_away' | 'picked_
     case 'picked_up':
       return `Hi ${riderName}, you have been picked up and we are on the way.`;
     case 'eta':
-      return `Hi ${riderName}, my ETA is ${view.outboundLeg.pickupTime}.`;
+      return `Hi ${riderName}, my ETA is ${view.activeLeg.pickupTime}.`;
     default:
       return `Hi ${riderName}, I am on the way.`;
   }
