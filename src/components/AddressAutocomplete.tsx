@@ -7,8 +7,9 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import Constants from 'expo-constants';
 import Ionicons from '@expo/vector-icons/Ionicons';
+
+import { env } from '@/config/env';
 
 type Suggestion = {
   mapbox_id: string;
@@ -24,7 +25,7 @@ type Props = {
   sessionToken: string;
 };
 
-const MAPBOX_TOKEN: string = Constants.expoConfig?.extra?.mapboxKey ?? '';
+const MAPBOX_TOKEN: string = env.mapboxKey;
 const SUGGEST_URL = 'https://api.mapbox.com/search/searchbox/v1/suggest';
 const RETRIEVE_URL = 'https://api.mapbox.com/search/searchbox/v1/retrieve';
 

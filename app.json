@@ -1,7 +1,8 @@
 {
   "expo": {
     "name": "RouteFlow",
-    "slug": "RouteFlow",
+    "slug": "routeflow",
+    "owner": "replit-private-4b2a0525-4f8e-49bd-80fe-1270efa35a94",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,7 +16,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.routeflow.app",
+      "bundleIdentifier": "app.replit.routeflow-rgg",
+      "appleTeamId": "5BNC3BC2C6",
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -40,7 +42,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "96879a4b-4885-4791-be3f-54b8cb0b2938"
+        "projectId": "3eb6b847-5748-4435-9668-78c92dc2d56b"
       }
     }
   }

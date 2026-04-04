@@ -1,8 +1,6 @@
-import Constants from 'expo-constants';
-
 const rawSupabaseUrl = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? '').trim();
 const rawSupabaseAnonKey = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
-const rawMapboxKey = ((Constants.expoConfig?.extra?.mapboxKey as string) ?? '').trim();
+const rawMapboxKey = (process.env.EXPO_PUBLIC_MAPBOX_KEY ?? '').trim();
 
 const isValidUrl = (url: string) => {
   try {
