@@ -1,47 +1,10 @@
+const appJson = require('./app.json');
+
 module.exports = {
   expo: {
-    name: 'RouteFlow',
-    slug: 'RouteFlow',
-    version: '1.0.0',
-    orientation: 'portrait',
-    icon: './assets/icon.png',
-    userInterfaceStyle: 'automatic',
-    newArchEnabled: true,
-    scheme: 'routeflow',
-    splash: {
-      image: './assets/splash-icon.png',
-      resizeMode: 'contain',
-      backgroundColor: '#ffffff',
-    },
-    ios: {
-      supportsTablet: true,
-      bundleIdentifier: 'com.routeflow.app',
-      usesAppleSignIn: true,
-      infoPlist: {
-        ITSAppUsesNonExemptEncryption: false,
-      },
-    },
-    android: {
-      adaptiveIcon: {
-        foregroundImage: './assets/adaptive-icon.png',
-        backgroundColor: '#ffffff',
-      },
-      edgeToEdgeEnabled: true,
-      predictiveBackGestureEnabled: false,
-    },
-    web: {
-      favicon: './assets/favicon.png',
-    },
-    plugins: [
-      'expo-apple-authentication',
-      'expo-secure-store',
-      '@react-native-community/datetimepicker',
-      'expo-web-browser',
-    ],
+    ...appJson.expo,
     extra: {
-      eas: {
-        projectId: '96879a4b-4885-4791-be3f-54b8cb0b2938',
-      },
+      ...appJson.expo.extra,
       mapboxKey: process.env.MAPBOX_PUBLIC_KEY ?? '',
     },
   },
