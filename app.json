@@ -49,12 +49,7 @@
     "extra": {
       "eas": {
         "projectId": "3eb6b847-5748-4435-9668-78c92dc2d56b"
-      },
-      "supabaseUrl": "https://eqaofmamoopijpbddorl.supabase.co",
-      "supabaseAnonKey": "sb_publishable_i-FvyYDOxi1WoEsT3GDU3Q_Xq1dY0fU",
-      "mapboxKey": "pk.eyJ1Ijoicmdnc3R1ZGlvIiwiYSI6ImNtbmpqc2pxOTBvMXgyc29nM3lleWFvNjUifQ.cGULfA6MEeZNd4_EVEojbg",
-      "googleIosClientId": "809975300407-dibhscai7ejtv378rtcotdo71lrja15t.apps.googleusercontent.com",
-      "siteUrl": "https://4b2a0525-4f8e-49bd-80fe-1270efa35a94-00-2ua1tsxujxrag.kirk.replit.dev"
+      }
     }
   }
 }
