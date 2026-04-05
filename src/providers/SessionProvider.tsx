@@ -270,16 +270,26 @@ export function SessionProvider({ children }: SessionProviderProps) {
         }
 
         // ── Generic native OAuth fallback (non-Google native providers) ──────
-        // In Expo Go the custom 'routeflow://' scheme is not registered, so we
-        // fall back to the exp:// URL that Expo Go can intercept. In production
-        // builds the custom scheme is used for a proper deep-link experience.
+        // In Expo Go the custom 'routeflow://' scheme isn't registered, so we
+        // use a two-step redirect:
+        //   1. Supabase → site URL (always whitelisted) with exp:// URL as a param
+        //   2. Web page immediately redirects to exp://... + tokens
+        //   3. openAuthSessionAsync intercepts the exp:// redirect
+        // In production builds the custom routeflow:// scheme is used directly.
         const isExpoGo = Constants.appOwnership === 'expo';
-        const redirectTo = isExpoGo
-          ? makeRedirectUri() // → exp://... (Expo Go native deep-link)
-          : makeRedirectUri({ scheme: 'routeflow', path: 'auth/callback' });
+        const nativeRedirectBase = makeRedirectUri(); // → exp://... in Expo Go
+        const productionRedirect = makeRedirectUri({ scheme: 'routeflow', path: 'auth/callback' });
+
+        const redirectTo = isExpoGo && env.siteUrl
+          ? `${env.siteUrl}?nativeRedirect=${encodeURIComponent(nativeRedirectBase)}`
+          : productionRedirect;
+
+        // openAuthSessionAsync watches for the scheme that will ultimately land in the app
+        const watchUrl = isExpoGo ? nativeRedirectBase : productionRedirect;
 
         if (__DEV__) {
           console.log('[OAuth] redirectTo:', redirectTo);
+          console.log('[OAuth] watchUrl:', watchUrl);
         }
 
         const { data, error } = await supabase.auth.signInWithOAuth({
@@ -298,7 +308,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
           throw new Error('Supabase did not return an authentication URL.');
         }
 
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+        const result = await WebBrowser.openAuthSessionAsync(data.url, watchUrl);
 
         if (__DEV__) {
           console.log('[OAuth] openAuthSessionAsync result:', result.type);

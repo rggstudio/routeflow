@@ -26,6 +26,12 @@ const rawGoogleIosClientId = (
   ''
 ).trim();
 
+const rawSiteUrl = (
+  (process.env.EXPO_PUBLIC_SITE_URL as string | undefined) ||
+  extra.siteUrl ||
+  ''
+).trim();
+
 const isValidUrl = (url: string) => {
   try {
     const parsed = new URL(url);
@@ -48,4 +54,5 @@ export const env = {
   isMapboxConfigured: Boolean(rawMapboxKey),
   googleIosClientId: rawGoogleIosClientId,
   isGoogleSignInConfigured: isRealClientId(rawGoogleIosClientId),
+  siteUrl: rawSiteUrl,
 };
