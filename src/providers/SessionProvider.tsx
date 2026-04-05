@@ -216,12 +216,8 @@ export function SessionProvider({ children }: SessionProviderProps) {
           return;
         }
 
-        // ── Google (native iOS/Android) ──────────────────────────────────────
-        if (provider === 'google' && Platform.OS !== 'web') {
-          if (!env.isGoogleSignInConfigured || !GoogleSignin) {
-            throw new Error('Google Sign-In is not configured for this build.');
-          }
-
+        // ── Google native SDK (custom dev build / production) ─────────────────
+        if (provider === 'google' && Platform.OS !== 'web' && GoogleSignin && env.isGoogleSignInConfigured) {
           try {
             await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
             const response = await GoogleSignin.signIn();
