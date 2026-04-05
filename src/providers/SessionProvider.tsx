@@ -4,17 +4,32 @@ import { Session } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
-import {
-  GoogleSignin,
-  statusCodes as GoogleStatusCodes,
-} from '@react-native-google-signin/google-signin';
 
 import { env } from '@/config/env';
 import { supabase } from '@/lib/supabase';
 
+let GoogleSignin: {
+  configure: (opts: object) => void;
+  hasPlayServices: (opts: object) => Promise<void>;
+  signIn: () => Promise<{ data?: { idToken?: string | null } }>;
+  signOut: () => Promise<void>;
+} | null = null;
+
+let GoogleStatusCodes: { SIGN_IN_CANCELLED: string } | null = null;
+
+try {
+  // This native module is only available in custom dev builds, not Expo Go.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const gsModule = require('@react-native-google-signin/google-signin');
+  GoogleSignin = gsModule.GoogleSignin;
+  GoogleStatusCodes = gsModule.statusCodes;
+} catch {
+  // Native module unavailable — Google Sign-In is disabled in this environment.
+}
+
 WebBrowser.maybeCompleteAuthSession();
 
-if (Platform.OS !== 'web' && env.isGoogleSignInConfigured) {
+if (Platform.OS !== 'web' && env.isGoogleSignInConfigured && GoogleSignin) {
   GoogleSignin.configure({
     iosClientId: env.googleIosClientId,
     scopes: ['email', 'profile'],
@@ -203,7 +218,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
 
         // ── Google (native iOS/Android) ──────────────────────────────────────
         if (provider === 'google' && Platform.OS !== 'web') {
-          if (!env.isGoogleSignInConfigured) {
+          if (!env.isGoogleSignInConfigured || !GoogleSignin) {
             throw new Error('Google Sign-In is not configured for this build.');
           }
 
@@ -229,6 +244,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
               typeof err === 'object' &&
               err !== null &&
               'code' in err &&
+              GoogleStatusCodes !== null &&
               (err as { code: string }).code === GoogleStatusCodes.SIGN_IN_CANCELLED
             ) {
               throw new Error('Google Sign-In was cancelled.');
@@ -337,7 +353,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
           return;
         }
 
-        if (Platform.OS !== 'web') {
+        if (Platform.OS !== 'web' && GoogleSignin) {
           try {
             await GoogleSignin.signOut();
           } catch {
