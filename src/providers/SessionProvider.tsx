@@ -4,6 +4,7 @@ import { Session } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
+import Constants from 'expo-constants';
 
 import { env } from '@/config/env';
 import { supabase } from '@/lib/supabase';
@@ -269,10 +270,17 @@ export function SessionProvider({ children }: SessionProviderProps) {
         }
 
         // ── Generic native OAuth fallback (non-Google native providers) ──────
-        const redirectTo = makeRedirectUri({
-          scheme: 'routeflow',
-          path: 'auth/callback',
-        });
+        // In Expo Go the custom 'routeflow://' scheme is not registered, so we
+        // fall back to the exp:// URL that Expo Go can intercept. In production
+        // builds the custom scheme is used for a proper deep-link experience.
+        const isExpoGo = Constants.appOwnership === 'expo';
+        const redirectTo = isExpoGo
+          ? makeRedirectUri() // → exp://... (Expo Go native deep-link)
+          : makeRedirectUri({ scheme: 'routeflow', path: 'auth/callback' });
+
+        if (__DEV__) {
+          console.log('[OAuth] redirectTo:', redirectTo);
+        }
 
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider,
