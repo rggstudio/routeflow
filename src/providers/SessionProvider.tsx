@@ -300,6 +300,11 @@ export function SessionProvider({ children }: SessionProviderProps) {
 
         const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
+        if (__DEV__) {
+          console.log('[OAuth] openAuthSessionAsync result:', result.type);
+          if (result.type === 'success') console.log('[OAuth] callback url:', result.url);
+        }
+
         if (result.type !== 'success' || !result.url) {
           throw new Error('Authentication was cancelled.');
         }
