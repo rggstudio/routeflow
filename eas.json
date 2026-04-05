@@ -12,7 +12,12 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://eqaofmamoopijpbddorl.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_i-FvyYDOxi1WoEsT3GDU3Q_Xq1dY0fU",
+        "EXPO_PUBLIC_MAPBOX_KEY": "pk.eyJ1Ijoicmdnc3R1ZGlvIiwiYSI6ImNtbmpqc2pxOTBvMXgyc29nM3lleWFvNjUifQ.cGULfA6MEeZNd4_EVEojbg"
+      }
     }
   },
   "submit": {
