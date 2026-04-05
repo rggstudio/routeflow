@@ -20,6 +20,12 @@ const rawMapboxKey = (
   ''
 ).trim();
 
+const rawGoogleIosClientId = (
+  (process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID as string | undefined) ||
+  extra.googleIosClientId ||
+  ''
+).trim();
+
 const isValidUrl = (url: string) => {
   try {
     const parsed = new URL(url);
@@ -31,10 +37,15 @@ const isValidUrl = (url: string) => {
 
 const urlValid = isValidUrl(rawSupabaseUrl);
 
+const isRealClientId = (id: string) =>
+  Boolean(id) && !id.startsWith('REPLACE_WITH');
+
 export const env = {
   supabaseUrl: rawSupabaseUrl,
   supabaseAnonKey: rawSupabaseAnonKey,
   isSupabaseConfigured: Boolean(rawSupabaseUrl && rawSupabaseAnonKey && urlValid),
   mapboxKey: rawMapboxKey,
   isMapboxConfigured: Boolean(rawMapboxKey),
+  googleIosClientId: rawGoogleIosClientId,
+  isGoogleSignInConfigured: isRealClientId(rawGoogleIosClientId),
 };

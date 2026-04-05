@@ -38,7 +38,13 @@
       "expo-apple-authentication",
       "expo-secure-store",
       "@react-native-community/datetimepicker",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.REPLACE_WITH_YOUR_CLIENT_ID"
+        }
+      ]
     ],
     "extra": {
       "eas": {
@@ -46,7 +52,8 @@
       },
       "supabaseUrl": "https://eqaofmamoopijpbddorl.supabase.co",
       "supabaseAnonKey": "sb_publishable_i-FvyYDOxi1WoEsT3GDU3Q_Xq1dY0fU",
-      "mapboxKey": "pk.eyJ1Ijoicmdnc3R1ZGlvIiwiYSI6ImNtbmpqc2pxOTBvMXgyc29nM3lleWFvNjUifQ.cGULfA6MEeZNd4_EVEojbg"
+      "mapboxKey": "pk.eyJ1Ijoicmdnc3R1ZGlvIiwiYSI6ImNtbmpqc2pxOTBvMXgyc29nM3lleWFvNjUifQ.cGULfA6MEeZNd4_EVEojbg",
+      "googleIosClientId": "REPLACE_WITH_IOS_CLIENT_ID.apps.googleusercontent.com"
     }
   }
 }

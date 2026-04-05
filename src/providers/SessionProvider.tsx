@@ -4,11 +4,22 @@ import { Session } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
+import {
+  GoogleSignin,
+  statusCodes as GoogleStatusCodes,
+} from '@react-native-google-signin/google-signin';
 
 import { env } from '@/config/env';
 import { supabase } from '@/lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
+
+if (Platform.OS !== 'web' && env.isGoogleSignInConfigured) {
+  GoogleSignin.configure({
+    iosClientId: env.googleIosClientId,
+    scopes: ['email', 'profile'],
+  });
+}
 
 export type SocialAuthProvider = 'apple' | 'google';
 
@@ -118,6 +129,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
           throw new Error('Supabase is not configured.');
         }
 
+        // ── Apple (native iOS only) ──────────────────────────────────────────
         if (provider === 'apple' && Platform.OS === 'ios') {
           const isAppleAuthAvailable = await AppleAuthentication.isAvailableAsync();
 
@@ -189,6 +201,45 @@ export function SessionProvider({ children }: SessionProviderProps) {
           return;
         }
 
+        // ── Google (native iOS/Android) ──────────────────────────────────────
+        if (provider === 'google' && Platform.OS !== 'web') {
+          if (!env.isGoogleSignInConfigured) {
+            throw new Error('Google Sign-In is not configured for this build.');
+          }
+
+          try {
+            await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+            const response = await GoogleSignin.signIn();
+            const idToken = response.data?.idToken;
+
+            if (!idToken) {
+              throw new Error('Google Sign-In did not return an ID token.');
+            }
+
+            const { error } = await supabase.auth.signInWithIdToken({
+              provider: 'google',
+              token: idToken,
+            });
+
+            if (error) {
+              throw error;
+            }
+          } catch (err: unknown) {
+            if (
+              typeof err === 'object' &&
+              err !== null &&
+              'code' in err &&
+              (err as { code: string }).code === GoogleStatusCodes.SIGN_IN_CANCELLED
+            ) {
+              throw new Error('Google Sign-In was cancelled.');
+            }
+            throw err;
+          }
+
+          return;
+        }
+
+        // ── Web OAuth flow (all providers on web) ────────────────────────────
         if (Platform.OS === 'web') {
           const redirectTo = window.location.origin;
           const { error } = await supabase.auth.signInWithOAuth({
@@ -205,6 +256,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
           return;
         }
 
+        // ── Generic native OAuth fallback (non-Google native providers) ──────
         const redirectTo = makeRedirectUri({
           scheme: 'routeflow',
           path: 'auth/callback',
@@ -246,7 +298,6 @@ export function SessionProvider({ children }: SessionProviderProps) {
           throw new Error(authError);
         }
 
-        // PKCE flow: exchange code for session
         const authCode = queryParams.get('code') ?? hashParams.get('code');
         if (authCode) {
           const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(authCode);
@@ -254,7 +305,6 @@ export function SessionProvider({ children }: SessionProviderProps) {
           return;
         }
 
-        // Implicit flow: tokens returned directly in hash
         const accessToken = hashParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token');
         if (accessToken && refreshToken) {
@@ -285,6 +335,14 @@ export function SessionProvider({ children }: SessionProviderProps) {
       signOut: async () => {
         if (!supabase) {
           return;
+        }
+
+        if (Platform.OS !== 'web') {
+          try {
+            await GoogleSignin.signOut();
+          } catch {
+            // If Google Sign-In wasn't used, this is a no-op
+          }
         }
 
         await supabase.auth.signOut();
