@@ -1,6 +1,24 @@
-const rawSupabaseUrl = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? '').trim();
-const rawSupabaseAnonKey = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
-const rawMapboxKey = (process.env.EXPO_PUBLIC_MAPBOX_KEY ?? '').trim();
+import Constants from 'expo-constants';
+
+const extra = (Constants.expoConfig?.extra ?? {}) as Record<string, string>;
+
+const rawSupabaseUrl = (
+  (process.env.EXPO_PUBLIC_SUPABASE_URL as string | undefined) ||
+  extra.supabaseUrl ||
+  ''
+).trim();
+
+const rawSupabaseAnonKey = (
+  (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string | undefined) ||
+  extra.supabaseAnonKey ||
+  ''
+).trim();
+
+const rawMapboxKey = (
+  (process.env.EXPO_PUBLIC_MAPBOX_KEY as string | undefined) ||
+  extra.mapboxKey ||
+  ''
+).trim();
 
 const isValidUrl = (url: string) => {
   try {
