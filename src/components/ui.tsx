@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { Pressable, ScrollView, type StyleProp, Switch, Text, TextInput, type ViewStyle, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, type StyleProp, Switch, Text, TextInput, type ViewStyle, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -10,9 +10,10 @@ type ScreenProps = {
   scroll?: boolean;
   avatarPlacement?: 'right' | 'center' | 'none';
   paddingTop?: number;
+  keyboardAware?: boolean;
 };
 
-export function Screen({ children, scroll = true, avatarPlacement = 'right', paddingTop = 20 }: ScreenProps) {
+export function Screen({ children, scroll = true, avatarPlacement = 'right', paddingTop = 20, keyboardAware = false }: ScreenProps) {
   const rightAvatar =
     avatarPlacement === 'right' ? (
       <View className="absolute right-0 top-0 z-10">
@@ -20,13 +21,29 @@ export function Screen({ children, scroll = true, avatarPlacement = 'right', pad
       </View>
     ) : null;
 
-  const content = scroll ? (
-    <ScrollView contentContainerStyle={{ padding: 20, paddingTop, paddingBottom: 140 }} keyboardShouldPersistTaps="handled">
+  const scrollView = (
+    <ScrollView
+      contentContainerStyle={{ padding: 20, paddingTop, paddingBottom: 140 }}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="interactive"
+    >
       <View className="relative">
         {rightAvatar}
         {children}
       </View>
     </ScrollView>
+  );
+
+  const content = scroll ? (
+    keyboardAware ? (
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
+        {scrollView}
+      </KeyboardAvoidingView>
+    ) : scrollView
   ) : (
     <View className="flex-1 px-5 pb-28 pt-5">
       <View className="relative flex-1">

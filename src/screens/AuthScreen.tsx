@@ -21,7 +21,7 @@ export function AuthScreen({ navigation, route }: Props) {
   }, [route.params?.mode]);
 
   return (
-    <Screen avatarPlacement="none">
+    <Screen avatarPlacement="none" keyboardAware>
       <View className="min-h-full justify-center">
         <View className="pb-6 pt-6">
           <View className="mb-6">
