@@ -31,7 +31,7 @@ export function LandingPage() {
             {/* Desktop Nav */}
             <div className="hidden md:flex items-center gap-8">
               <a href="#features" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">Features</a>
-              <a href="#pricing" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">Pricing</a>
+              <a href="#testimonials" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">Reviews</a>
               <a href="#download" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">Download</a>
               <Button className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold rounded-full px-6">
                 Get the App
@@ -53,7 +53,7 @@ export function LandingPage() {
           <div className="md:hidden bg-slate-900 border-b border-slate-800">
             <div className="px-4 pt-2 pb-6 space-y-4">
               <a href="#features" className="block px-3 py-2 text-base font-medium text-slate-300 hover:text-white">Features</a>
-              <a href="#pricing" className="block px-3 py-2 text-base font-medium text-slate-300 hover:text-white">Pricing</a>
+              <a href="#testimonials" className="block px-3 py-2 text-base font-medium text-slate-300 hover:text-white">Reviews</a>
               <a href="#download" className="block px-3 py-2 text-base font-medium text-slate-300 hover:text-white">Download</a>
               <div className="pt-2">
                 <Button className="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold rounded-full">
@@ -75,7 +75,7 @@ export function LandingPage() {
                 The ultimate driver app
               </div>
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight mb-6 leading-[1.1]">
-                Your transportation business, <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">simplified.</span>
+                Run Your Rides. <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Own Your Earnings.</span>
               </h1>
               <p className="text-lg sm:text-xl text-slate-400 mb-8 leading-relaxed max-w-xl">
                 RouteFlow is the premium ride management app built specifically for the independent transportation driver. Stop paying fleet fees and take control of your schedule.
@@ -235,11 +235,11 @@ export function LandingPage() {
                           <Car className="w-5 h-5 text-slate-400" />
                         </div>
                         <div>
-                          <div className="font-semibold text-slate-200">{client}</div>
-                          <div className="text-xs text-slate-500">{time} • {route}</div>
+                          <div className="font-semibold text-slate-200">{ride.client}</div>
+                          <div className="text-xs text-slate-500">{ride.time} • {ride.route}</div>
                         </div>
                       </div>
-                      <div className="font-bold text-cyan-400">{amount}</div>
+                      <div className="font-bold text-cyan-400">{ride.amount}</div>
                     </div>
                   ))}
                 </div>
@@ -250,7 +250,7 @@ export function LandingPage() {
       </section>
 
       {/* Social Proof / Testimonials */}
-      <section className="py-24 bg-slate-900 border-y border-slate-800">
+      <section id="testimonials" className="py-24 bg-slate-900 border-y border-slate-800">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Loved by solo operators</h2>
