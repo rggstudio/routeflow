@@ -43,12 +43,15 @@ const isValidUrl = (url: string) => {
 
 const urlValid = isValidUrl(rawSupabaseUrl);
 
+const supabaseHost = urlValid ? new URL(rawSupabaseUrl).host : '';
+
 const isRealClientId = (id: string) =>
   Boolean(id) && !id.startsWith('REPLACE_WITH');
 
 export const env = {
   supabaseUrl: rawSupabaseUrl,
   supabaseAnonKey: rawSupabaseAnonKey,
+  supabaseHost,
   isSupabaseConfigured: Boolean(rawSupabaseUrl && rawSupabaseAnonKey && urlValid),
   mapboxKey: rawMapboxKey,
   isMapboxConfigured: Boolean(rawMapboxKey),

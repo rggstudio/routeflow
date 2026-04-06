@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { ActionButton, Screen, SectionCard, StatTile } from '@/components/ui';
+import { env } from '@/config/env';
 import { supabase } from '@/lib/supabase';
 import { todayIso } from '@/lib/date';
 import { useRouteFlow } from '@/providers/RouteFlowProvider';
@@ -44,6 +45,39 @@ function getDriverLabel(row: AdminDriverStatsRow) {
   return row.full_name?.trim() || row.email || 'Driver';
 }
 
+function getAdminStatsErrorMessage(error: unknown) {
+  const fallback = 'Unable to load admin stats.';
+
+  if (error == null || typeof error !== 'object') {
+    return fallback;
+  }
+
+  const maybeError = error as {
+    code?: string | null;
+    details?: string | null;
+    hint?: string | null;
+    message?: string | null;
+  };
+
+  const message = maybeError.message?.trim() || '';
+  const details = maybeError.details?.trim() || '';
+  const hint = maybeError.hint?.trim() || '';
+  const code = maybeError.code?.trim() || '';
+  const combined = [message, details, hint].filter(Boolean).join(' ');
+
+  if (combined.includes('admin_driver_stats')) {
+    const projectHost = env.supabaseHost || 'your Supabase project';
+
+    return 'Unable to load admin stats from ' + projectHost + '. Deploy the admin analytics migration so the admin_driver_stats RPC exists.';
+  }
+
+  if (combined) {
+    return code ? combined + ' (' + code + ')' : combined;
+  }
+
+  return code ? fallback + ' (' + code + ')' : fallback;
+}
+
 export function AdminDashboardScreen() {
   const { state } = useRouteFlow();
   const [rows, setRows] = useState<AdminDriverStatsRow[]>([]);
@@ -54,7 +88,6 @@ export function AdminDashboardScreen() {
   const loadStats = useCallback(async (isManualRefresh = false) => {
     if (!supabase) {
       setErrorMessage('Supabase is not configured.');
-      setRows([]);
       setIsLoading(false);
       setIsRefreshing(false);
       return;
@@ -78,8 +111,7 @@ export function AdminDashboardScreen() {
       setRows((data ?? []) as AdminDriverStatsRow[]);
       setErrorMessage(null);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to load admin stats.');
-      setRows([]);
+      setErrorMessage(getAdminStatsErrorMessage(error));
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -154,11 +186,27 @@ export function AdminDashboardScreen() {
           <View className="flex-row flex-wrap gap-3">
             <StatTile label="Drivers" value={String(totals.drivers)} />
             <StatTile label="Riders" value={String(totals.activeRiders)} />
-            <StatTile label="Rides today" value={String(totals.ridesToday)} tone="positive" />
+            <StatTile
+              label="Rides today"
+              value={String(totals.ridesToday)}
+              tone="positive"
+            />
             <StatTile label="Upcoming" value={String(totals.upcoming)} />
-            <StatTile label="Completed week" value={String(totals.completedWeek)} tone="positive" />
-            <StatTile label="Canceled week" value={String(totals.canceledWeek)} tone="negative" />
-            <StatTile label="Dropoffs week" value={String(totals.dropoffsWeek)} tone="warning" />
+            <StatTile
+              label="Completed week"
+              value={String(totals.completedWeek)}
+              tone="positive"
+            />
+            <StatTile
+              label="Canceled week"
+              value={String(totals.canceledWeek)}
+              tone="negative"
+            />
+            <StatTile
+              label="Dropoffs week"
+              value={String(totals.dropoffsWeek)}
+              tone="warning"
+            />
           </View>
         </SectionCard>
 
