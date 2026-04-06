@@ -9,6 +9,8 @@ import Constants from 'expo-constants';
 import { env } from '@/config/env';
 import { supabase } from '@/lib/supabase';
 
+const OWNER_ADMIN_EMAIL = 'shopmaster73@gmail.com';
+
 let GoogleSignin: {
   configure: (opts: object) => void;
   hasPlayServices: (opts: object) => Promise<void>;
@@ -78,6 +80,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
         typeof nextSession.user.user_metadata.full_name === 'string'
           ? nextSession.user.user_metadata.full_name
           : (nextSession.user.email?.split('@')[0] ?? null);
+      const isOwnerAdmin = nextSession.user.email?.trim().toLowerCase() === OWNER_ADMIN_EMAIL;
 
       await client.from('profiles').upsert(
         {
@@ -90,6 +93,13 @@ export function SessionProvider({ children }: SessionProviderProps) {
           ignoreDuplicates: true,
         }
       );
+
+      if (isOwnerAdmin) {
+        await client
+          .from('profiles')
+          .update({ is_admin: true })
+          .eq('id', nextSession.user.id);
+      }
 
       await client.from('driver_preferences').upsert(
         {

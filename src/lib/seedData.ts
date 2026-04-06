@@ -14,10 +14,13 @@ export function createInitialState(): RouteFlowState {
       name: 'Jamie Carter',
       phone: '(555) 010-2323',
       avatarUrl: '',
+      isAdmin: false,
     },
     preferences: {
       defaultNavigationApp: 'waze',
       notificationsEnabled: true,
+      firstRideSummaryEnabled: true,
+      firstRideSummaryLeadTimeMinutes: 60,
     },
     tripGroups: [
       {

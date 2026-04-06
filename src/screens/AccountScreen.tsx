@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Alert, Linking, Platform, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import Constants from 'expo-constants';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { AuthFormCard } from '@/components/AuthFormCard';
 import { UserAvatar } from '@/components/UserAvatar';
@@ -18,6 +20,7 @@ import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/SessionProvider';
 import { useToast } from '@/providers/ToastProvider';
 import { useRouteFlow } from '@/providers/RouteFlowProvider';
+import { RootStackParamList } from '@/types/navigation';
 import { FirstRideSummaryLeadTime, NavigationApp } from '@/types/ride';
 
 const navApps: NavigationApp[] = ['waze', 'google_maps', 'apple_maps'];
@@ -78,6 +81,7 @@ function getFirstRideSummaryLeadTimeLabel(minutes: FirstRideSummaryLeadTime) {
 }
 
 export function AccountScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { state, updateProfile, updatePreferences } = useRouteFlow();
   const { isConfigured, session, signOut } = useSession();
   const { showToast } = useToast();
@@ -269,6 +273,19 @@ export function AccountScreen() {
 
       {session ? (
         <>
+          {state.profile.isAdmin ? (
+            <SectionCard title="Owner tools" eyebrow="Private">
+              <Text className="mb-4 text-sm leading-6 text-slate-300">
+                Open the private owner dashboard to see driver-level usage, ride totals, and weekly activity.
+              </Text>
+              <ActionButton
+                label="Open admin dashboard"
+                kind="primary"
+                onPress={() => navigation.navigate('AdminDashboard')}
+              />
+            </SectionCard>
+          ) : null}
+
           <SectionCard title="Profile">
             <InputField
               label="Name"

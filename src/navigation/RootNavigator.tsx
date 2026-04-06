@@ -5,6 +5,7 @@ import { Screen } from '@/components/ui';
 import { useSession } from '@/providers/SessionProvider';
 import { AuthScreen } from '@/screens/AuthScreen';
 import { DashboardScreen } from '@/screens/DashboardScreen';
+import { AdminDashboardScreen } from '@/screens/AdminDashboardScreen';
 import { RideDetailScreen } from '@/screens/RideDetailScreen';
 import { RideFormScreen } from '@/screens/RideFormScreen';
 import { SplashScreen } from '@/screens/SplashScreen';
@@ -64,6 +65,13 @@ export function RootNavigator() {
               name="Dashboard"
               component={DashboardScreen}
               options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="AdminDashboard"
+              component={AdminDashboardScreen}
+              options={{
+                title: 'Admin dashboard',
+              }}
             />
             <Stack.Screen
               name="RideDetail"

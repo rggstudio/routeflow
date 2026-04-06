@@ -26,7 +26,8 @@ import {
 } from '@/types/ride';
 import { Tables, TablesInsert } from '@/types/supabase';
 
-const OCCURRENCE_WINDOW_DAYS = 28;
+const RECURRING_LOOKAHEAD_DAYS = 90;
+const OWNER_ADMIN_EMAIL = 'shopmaster73@gmail.com';
 
 type TripGroupRow = Tables<'trip_groups'>;
 type TripOccurrenceRow = Tables<'trip_occurrences'>;
@@ -84,12 +85,13 @@ function isCanceledStatus(status: RideStatus) {
   return status === 'canceled' || status === 'canceled_paid';
 }
 
-function createEmptyState(fallbackName = ''): RouteFlowState {
+function createEmptyState(fallbackName = '', isAdmin = false): RouteFlowState {
   return {
     profile: {
       name: fallbackName,
       phone: '',
       avatarUrl: '',
+      isAdmin,
     },
     preferences: {
       defaultNavigationApp: 'google_maps',
@@ -103,11 +105,12 @@ function createEmptyState(fallbackName = ''): RouteFlowState {
   };
 }
 
-function mapProfile(profile: ProfileRow | null, fallbackName = ''): DriverProfile {
+function mapProfile(profile: ProfileRow | null, fallbackName = '', isAdminFallback = false): DriverProfile {
   return {
     name: profile?.full_name ?? fallbackName,
     phone: profile?.phone ?? '',
     avatarUrl: profile?.avatar_url ?? '',
+    isAdmin: profile?.is_admin ?? isAdminFallback,
   };
 }
 
@@ -177,6 +180,90 @@ function splitRoundTripPay(totalAmount: number) {
   };
 }
 
+function isOwnerEmail(email?: string | null) {
+  return email?.trim().toLowerCase() === OWNER_ADMIN_EMAIL;
+}
+
+function maxIsoDate(left: string, right: string) {
+  return left > right ? left : right;
+}
+
+function buildOccurrencesAndLegsForServiceDates(
+  draft: RideDraft,
+  groupId: string,
+  dates: string[]
+) {
+  const occurrences: TablesInsert<'trip_occurrences'>[] = [];
+  const legs: TablesInsert<'trip_legs'>[] = [];
+  const payAmount = Number(draft.payAmount || '0');
+  const splitPay = splitRoundTripPay(payAmount);
+
+  for (const serviceDate of dates) {
+    const outboundOccurrenceId = createUuid();
+    occurrences.push({
+      id: outboundOccurrenceId,
+      trip_group_id: groupId,
+      service_date: serviceDate,
+      status: 'scheduled',
+      override_pay_amount: draft.tripType === 'round_trip' ? splitPay.outbound : null,
+    });
+
+    legs.push({
+      id: createUuid(),
+      trip_occurrence_id: outboundOccurrenceId,
+      leg_type: 'outbound',
+      pickup_address: draft.pickupAddress.trim(),
+      dropoff_address: draft.dropoffAddress.trim(),
+      pickup_time: draft.pickupTime.trim(),
+      status: 'scheduled',
+    });
+
+    if (draft.tripType === 'round_trip') {
+      const returnOccurrenceId = createUuid();
+      occurrences.push({
+        id: returnOccurrenceId,
+        trip_group_id: groupId,
+        service_date: serviceDate,
+        status: 'scheduled',
+        override_pay_amount: splitPay.return,
+      });
+
+      legs.push({
+        id: createUuid(),
+        trip_occurrence_id: returnOccurrenceId,
+        leg_type: 'return',
+        pickup_address: draft.dropoffAddress.trim(),
+        dropoff_address: draft.returnDropoffAddress.trim() || draft.pickupAddress.trim(),
+        pickup_time: draft.returnPickupTime.trim(),
+        status: 'scheduled',
+      });
+    }
+  }
+
+  return { occurrences, legs };
+}
+
+function getRecurringDatesForWindow(
+  recurrenceDays: number[],
+  startIso: string,
+  windowDays: number
+) {
+  const allowed = new Set(recurrenceDays);
+  const startDate = fromIsoDate(startIso);
+  const dates: string[] = [];
+
+  for (let offset = 0; offset < windowDays; offset += 1) {
+    const next = addDays(startDate, offset);
+    const day = next.getDay() === 0 ? 7 : next.getDay();
+
+    if (allowed.has(day)) {
+      dates.push(toIsoDate(next));
+    }
+  }
+
+  return dates;
+}
+
 function getSortedViews(state: RouteFlowState) {
   const groupMap = new Map(state.tripGroups.map((group) => [group.id, group]));
   const legsByOccurrence = new Map<string, TripLeg[]>();
@@ -187,40 +274,40 @@ function getSortedViews(state: RouteFlowState) {
     legsByOccurrence.set(leg.tripOccurrenceId, current);
   }
 
-  const baseViews = state.tripOccurrences
-    .map((occurrence) => {
-      const group = groupMap.get(occurrence.tripGroupId);
+  const baseViews: RideOccurrenceView[] = [];
 
-      if (!group) {
-        return null;
-      }
+  for (const occurrence of state.tripOccurrences) {
+    const group = groupMap.get(occurrence.tripGroupId);
 
-      const legs = [...(legsByOccurrence.get(occurrence.id) ?? [])].sort((a, b) =>
-        compareTime(a.pickupTime, b.pickupTime)
-      );
-      const activeLeg = legs[0];
+    if (!group) {
+      continue;
+    }
 
-      if (!activeLeg) {
-        return null;
-      }
+    const legs = [...(legsByOccurrence.get(occurrence.id) ?? [])].sort((a, b) =>
+      compareTime(a.pickupTime, b.pickupTime)
+    );
+    const activeLeg = legs[0];
 
-      const splitPay = splitRoundTripPay(group.payAmount);
-      const effectivePay =
-        occurrence.overridePayAmount ??
-        (group.tripType === 'round_trip' && legs.length === 1
-          ? splitPay[activeLeg.legType]
-          : group.payAmount);
+    if (!activeLeg) {
+      continue;
+    }
 
-      return {
-        occurrence,
-        group,
-        legs,
-        activeLeg,
-        pairedLeg: null,
-        effectivePay,
-      };
-    })
-    .filter((view): view is RideOccurrenceView => view !== null);
+    const splitPay = splitRoundTripPay(group.payAmount);
+    const effectivePay =
+      occurrence.overridePayAmount ??
+      (group.tripType === 'round_trip' && legs.length === 1
+        ? splitPay[activeLeg.legType]
+        : group.payAmount);
+
+    baseViews.push({
+      occurrence,
+      group,
+      legs,
+      activeLeg,
+      pairedLeg: null,
+      effectivePay,
+    });
+  }
 
   return baseViews
     .map((view) => {
@@ -307,63 +394,9 @@ function buildInsertPayload(draft: RideDraft, driverId: string, existingGroupId?
   if (draft.recurrenceType === 'none') {
     dates.push(draft.serviceDate);
   } else {
-    const allowed = new Set(recurrenceDays);
-
-    for (let offset = 0; offset < OCCURRENCE_WINDOW_DAYS; offset += 1) {
-      const next = addDays(startDate, offset);
-      const day = next.getDay() === 0 ? 7 : next.getDay();
-
-      if (allowed.has(day)) {
-        dates.push(toIsoDate(next));
-      }
-    }
+    dates.push(...getRecurringDatesForWindow(recurrenceDays, toIsoDate(startDate), RECURRING_LOOKAHEAD_DAYS));
   }
-
-  const occurrences: TablesInsert<'trip_occurrences'>[] = [];
-  const legs: TablesInsert<'trip_legs'>[] = [];
-  const splitPay = splitRoundTripPay(payAmount);
-
-  for (const serviceDate of dates) {
-    const outboundOccurrenceId = createUuid();
-    occurrences.push({
-      id: outboundOccurrenceId,
-      trip_group_id: groupId,
-      service_date: serviceDate,
-      status: 'scheduled',
-      override_pay_amount: draft.tripType === 'round_trip' ? splitPay.outbound : null,
-    });
-
-    legs.push({
-      id: createUuid(),
-      trip_occurrence_id: outboundOccurrenceId,
-      leg_type: 'outbound',
-      pickup_address: draft.pickupAddress.trim(),
-      dropoff_address: draft.dropoffAddress.trim(),
-      pickup_time: draft.pickupTime.trim(),
-      status: 'scheduled',
-    });
-
-    if (draft.tripType === 'round_trip') {
-      const returnOccurrenceId = createUuid();
-      occurrences.push({
-        id: returnOccurrenceId,
-        trip_group_id: groupId,
-        service_date: serviceDate,
-        status: 'scheduled',
-        override_pay_amount: splitPay.return,
-      });
-
-      legs.push({
-        id: createUuid(),
-        trip_occurrence_id: returnOccurrenceId,
-        leg_type: 'return',
-        pickup_address: draft.dropoffAddress.trim(),
-        dropoff_address: draft.returnDropoffAddress.trim() || draft.pickupAddress.trim(),
-        pickup_time: draft.returnPickupTime.trim(),
-        status: 'scheduled',
-      });
-    }
-  }
+  const { occurrences, legs } = buildOccurrencesAndLegsForServiceDates(draft, groupId, dates);
 
   return { group, occurrences, legs };
 }
@@ -477,11 +510,81 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
     };
   }, [session]);
 
+  const syncRecurringCoverage = useCallback(
+    async (nextState: RouteFlowState) => {
+      if (!supabase || !session) {
+        return false;
+      }
+
+      const today = todayIso();
+      let newOccurrences: TablesInsert<'trip_occurrences'>[] = [];
+      let newLegs: TablesInsert<'trip_legs'>[] = [];
+
+      for (const group of nextState.tripGroups) {
+        if (group.recurrenceType === 'none') {
+          continue;
+        }
+
+        const draft = createDraftFromGroup(nextState, group.id);
+        const windowStartIso = maxIsoDate(today, draft.serviceDate);
+        const windowEndIso = toIsoDate(
+          addDays(fromIsoDate(windowStartIso), RECURRING_LOOKAHEAD_DAYS - 1)
+        );
+        const existingDates = new Set(
+          nextState.tripOccurrences
+            .filter(
+              (occurrence) =>
+                occurrence.tripGroupId === group.id &&
+                occurrence.serviceDate >= windowStartIso &&
+                occurrence.serviceDate <= windowEndIso
+            )
+            .map((occurrence) => occurrence.serviceDate)
+        );
+        const desiredDates = getRecurringDatesForWindow(
+          group.recurrenceDays,
+          windowStartIso,
+          RECURRING_LOOKAHEAD_DAYS
+        );
+        const missingDates = desiredDates.filter((serviceDate) => !existingDates.has(serviceDate));
+
+        if (missingDates.length === 0) {
+          continue;
+        }
+
+        const payload = buildOccurrencesAndLegsForServiceDates(draft, group.id, missingDates);
+        newOccurrences = [...newOccurrences, ...payload.occurrences];
+        newLegs = [...newLegs, ...payload.legs];
+      }
+
+      if (newOccurrences.length === 0 || newLegs.length === 0) {
+        return false;
+      }
+
+      const { error: occurrenceError } = await supabase
+        .from('trip_occurrences')
+        .insert(newOccurrences);
+
+      if (occurrenceError) {
+        throw occurrenceError;
+      }
+
+      const { error: legsError } = await supabase.from('trip_legs').insert(newLegs);
+
+      if (legsError) {
+        throw legsError;
+      }
+
+      return true;
+    },
+    [session]
+  );
+
   const loadState = useCallback(async () => {
     const fallbackName = session?.user.email?.split('@')[0] ?? '';
+    const isAdminFallback = isOwnerEmail(session?.user.email);
 
     if (!supabase || !session) {
-      setState(createEmptyState(fallbackName));
+      setState(createEmptyState(fallbackName, isAdminFallback));
       setIsHydrated(true);
       return;
     }
@@ -523,20 +626,45 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
         throw tripLegsResult.error;
       }
 
-      setState({
-        profile: mapProfile(profileResult.data, fallbackName),
+      let nextState: RouteFlowState = {
+        profile: mapProfile(profileResult.data, fallbackName, isAdminFallback),
         preferences: mapPreferences(preferencesResult.data),
         tripGroups: mapTripGroups(tripGroupsResult.data ?? []),
         tripOccurrences: mapTripOccurrences(tripOccurrencesResult.data ?? []),
         tripLegs: mapTripLegs(tripLegsResult.data ?? []),
-      });
+      };
+
+      const didExtendRecurringCoverage = await syncRecurringCoverage(nextState);
+
+      if (didExtendRecurringCoverage) {
+        const [refreshedOccurrencesResult, refreshedLegsResult] = await Promise.all([
+          supabase.from('trip_occurrences').select('*').order('service_date', { ascending: true }),
+          supabase.from('trip_legs').select('*').order('pickup_time', { ascending: true }),
+        ]);
+
+        if (refreshedOccurrencesResult.error) {
+          throw refreshedOccurrencesResult.error;
+        }
+
+        if (refreshedLegsResult.error) {
+          throw refreshedLegsResult.error;
+        }
+
+        nextState = {
+          ...nextState,
+          tripOccurrences: mapTripOccurrences(refreshedOccurrencesResult.data ?? []),
+          tripLegs: mapTripLegs(refreshedLegsResult.data ?? []),
+        };
+      }
+
+      setState(nextState);
     } catch (error) {
       console.error('Failed to load RouteFlow state from Supabase', error);
-      setState(createEmptyState(fallbackName));
+      setState(createEmptyState(fallbackName, isAdminFallback));
     } finally {
       setIsHydrated(true);
     }
-  }, [session]);
+  }, [session, syncRecurringCoverage]);
 
   const setOccurrenceStatus = useCallback(
     async (occurrenceId: string, status: RideStatus) => {

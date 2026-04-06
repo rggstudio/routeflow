@@ -47,6 +47,7 @@ export type DriverProfile = {
   name: string;
   phone: string;
   avatarUrl: string;
+  isAdmin: boolean;
 };
 
 export type DriverPreferences = {

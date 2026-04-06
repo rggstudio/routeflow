@@ -56,6 +56,7 @@ export type Database = {
           created_at: string;
           full_name: string | null;
           id: string;
+          is_admin: boolean;
           phone: string | null;
           updated_at: string;
         };
@@ -64,6 +65,7 @@ export type Database = {
           created_at?: string;
           full_name?: string | null;
           id: string;
+          is_admin?: boolean;
           phone?: string | null;
           updated_at?: string;
         };
@@ -72,6 +74,7 @@ export type Database = {
           created_at?: string;
           full_name?: string | null;
           id?: string;
+          is_admin?: boolean;
           phone?: string | null;
           updated_at?: string;
         };
@@ -316,7 +319,31 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      admin_driver_stats: {
+        Args: {
+          report_date?: string;
+        };
+        Returns: {
+          active_riders: number;
+          canceled_rides_week: number;
+          completed_rides_week: number;
+          created_at: string;
+          driver_id: string;
+          dropoffs_week: number;
+          email: string | null;
+          full_name: string | null;
+          is_admin: boolean;
+          last_activity_at: string | null;
+          next_pickup_at: string | null;
+          rides_today: number;
+          total_trip_groups: number;
+          upcoming_rides: number;
+        }[];
+      };
+      current_user_is_admin: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
     };
     Enums: {
       [_ in never]: never;
