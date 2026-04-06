@@ -36,6 +36,7 @@
     },
     "plugins": [
       "expo-apple-authentication",
+      "expo-notifications",
       "expo-secure-store",
       "@react-native-community/datetimepicker",
       "expo-web-browser",

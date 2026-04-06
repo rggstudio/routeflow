@@ -13,13 +13,15 @@ import {
   SectionCard,
   ToggleRow,
 } from '@/components/ui';
+import { requestNotificationPermissions } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/SessionProvider';
 import { useToast } from '@/providers/ToastProvider';
 import { useRouteFlow } from '@/providers/RouteFlowProvider';
-import { NavigationApp } from '@/types/ride';
+import { FirstRideSummaryLeadTime, NavigationApp } from '@/types/ride';
 
 const navApps: NavigationApp[] = ['waze', 'google_maps', 'apple_maps'];
+const firstRideSummaryLeadTimes: FirstRideSummaryLeadTime[] = [15, 30, 60];
 const appVersion = (Constants.expoConfig?.version ?? '1.0.0') as string;
 const avatarBuckets = ['diver_avatar', 'driver_avatar'] as const;
 
@@ -65,6 +67,14 @@ function getAvatarContentType(asset: ImagePicker.ImagePickerAsset, extension: st
   }
 
   return 'image/jpeg';
+}
+
+function getFirstRideSummaryLeadTimeLabel(minutes: FirstRideSummaryLeadTime) {
+  if (minutes === 60) {
+    return '1 hour before';
+  }
+
+  return `${minutes} min before`;
 }
 
 export function AccountScreen() {
@@ -199,6 +209,23 @@ export function AccountScreen() {
   const handleSavePreferences = async () => {
     try {
       setIsSavingPreferences(true);
+
+      if (
+        Platform.OS !== 'web' &&
+        preferencesDraft.notificationsEnabled &&
+        preferencesDraft.firstRideSummaryEnabled
+      ) {
+        const permission = await requestNotificationPermissions();
+
+        if (!permission.granted) {
+          Alert.alert(
+            'Notifications are off',
+            'Allow notifications for RouteFlow so the first ride summary can show up on your device.'
+          );
+          return;
+        }
+      }
+
       await updatePreferences(preferencesDraft);
       showToast({ title: 'Preferences saved', message: 'RouteFlow updated your default settings.' });
     } catch (error) {
@@ -288,6 +315,46 @@ export function AccountScreen() {
                 }))
               }
             />
+            {preferencesDraft.notificationsEnabled ? (
+              <View className="mt-4 gap-4 rounded-[28px] border border-white/10 bg-white/5 px-4 py-4">
+                <View>
+                  <Text className="text-sm font-semibold text-white">First ride summary</Text>
+                  <Text className="mt-1 text-sm leading-6 text-slate-400">
+                    Send one morning reminder before the first scheduled pickup of the day.
+                  </Text>
+                </View>
+                <ToggleRow
+                  label="Morning summary"
+                  value={preferencesDraft.firstRideSummaryEnabled}
+                  onValueChange={(value) =>
+                    setPreferencesDraft((current) => ({
+                      ...current,
+                      firstRideSummaryEnabled: value,
+                    }))
+                  }
+                />
+                {preferencesDraft.firstRideSummaryEnabled ? (
+                  <View>
+                    <Text className="mb-2 text-sm font-medium text-slate-300">Send it</Text>
+                    <View className="flex-row flex-wrap gap-2">
+                      {firstRideSummaryLeadTimes.map((minutes) => (
+                        <PillButton
+                          key={minutes}
+                          label={getFirstRideSummaryLeadTimeLabel(minutes)}
+                          selected={preferencesDraft.firstRideSummaryLeadTimeMinutes === minutes}
+                          onPress={() =>
+                            setPreferencesDraft((current) => ({
+                              ...current,
+                              firstRideSummaryLeadTimeMinutes: minutes,
+                            }))
+                          }
+                        />
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
             <View className="mt-4">
               <ActionButton
                 label={isSavingPreferences ? 'Saving...' : 'Save preferences'}

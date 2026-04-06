@@ -8,6 +8,7 @@ export type RideStatus =
   | 'canceled_paid';
 export type LegType = 'outbound' | 'return';
 export type NavigationApp = 'waze' | 'google_maps' | 'apple_maps';
+export type FirstRideSummaryLeadTime = 15 | 30 | 60;
 
 export type TripGroup = {
   id: string;
@@ -51,6 +52,8 @@ export type DriverProfile = {
 export type DriverPreferences = {
   defaultNavigationApp: NavigationApp;
   notificationsEnabled: boolean;
+  firstRideSummaryEnabled: boolean;
+  firstRideSummaryLeadTimeMinutes: FirstRideSummaryLeadTime;
 };
 
 export type RideDraft = {

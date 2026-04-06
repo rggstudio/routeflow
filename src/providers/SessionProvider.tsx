@@ -96,6 +96,8 @@ export function SessionProvider({ children }: SessionProviderProps) {
           driver_id: nextSession.user.id,
           default_navigation_app: 'google_maps',
           notifications_enabled: true,
+          first_ride_summary_enabled: true,
+          first_ride_summary_lead_time_minutes: 60,
         },
         {
           onConflict: 'driver_id',

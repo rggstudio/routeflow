@@ -9,11 +9,13 @@ import {
   toIsoDate,
   todayIso,
 } from '@/lib/date';
+import { configureNotificationChannel, syncFirstRideSummaryNotification } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/SessionProvider';
 import {
   DriverPreferences,
   DriverProfile,
+  FirstRideSummaryLeadTime,
   RideDraft,
   RideOccurrenceView,
   RideStatus,
@@ -92,6 +94,8 @@ function createEmptyState(fallbackName = ''): RouteFlowState {
     preferences: {
       defaultNavigationApp: 'google_maps',
       notificationsEnabled: true,
+      firstRideSummaryEnabled: true,
+      firstRideSummaryLeadTimeMinutes: 60,
     },
     tripGroups: [],
     tripOccurrences: [],
@@ -108,11 +112,18 @@ function mapProfile(profile: ProfileRow | null, fallbackName = ''): DriverProfil
 }
 
 function mapPreferences(preferences: DriverPreferencesRow | null): DriverPreferences {
+  const leadTime = preferences?.first_ride_summary_lead_time_minutes;
+
   return {
     defaultNavigationApp:
       (preferences?.default_navigation_app as DriverPreferences['defaultNavigationApp']) ??
       'google_maps',
     notificationsEnabled: preferences?.notifications_enabled ?? true,
+    firstRideSummaryEnabled: preferences?.first_ride_summary_enabled ?? true,
+    firstRideSummaryLeadTimeMinutes:
+      leadTime === 15 || leadTime === 30 || leadTime === 60
+        ? (leadTime as FirstRideSummaryLeadTime)
+        : 60,
   };
 }
 
@@ -563,7 +574,19 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
     void loadState();
   }, [loadState]);
 
+  useEffect(() => {
+    void configureNotificationChannel();
+  }, []);
+
   const sortedViews = useMemo(() => getSortedViews(state), [state]);
+
+  useEffect(() => {
+    if (!isHydrated) {
+      return;
+    }
+
+    void syncFirstRideSummaryNotification(sortedViews, state.preferences);
+  }, [isHydrated, sortedViews, state.preferences]);
 
   const value = useMemo<RouteFlowContextValue>(
     () => ({
@@ -768,6 +791,8 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
           driver_id: userId,
           default_navigation_app: preferences.defaultNavigationApp,
           notifications_enabled: preferences.notificationsEnabled,
+          first_ride_summary_enabled: preferences.firstRideSummaryEnabled,
+          first_ride_summary_lead_time_minutes: preferences.firstRideSummaryLeadTimeMinutes,
         });
 
         if (error) {

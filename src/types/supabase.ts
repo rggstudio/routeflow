@@ -17,6 +17,8 @@ export type Database = {
           created_at: string;
           default_navigation_app: string;
           driver_id: string;
+          first_ride_summary_enabled: boolean;
+          first_ride_summary_lead_time_minutes: number;
           notifications_enabled: boolean;
           updated_at: string;
         };
@@ -24,6 +26,8 @@ export type Database = {
           created_at?: string;
           default_navigation_app?: string;
           driver_id: string;
+          first_ride_summary_enabled?: boolean;
+          first_ride_summary_lead_time_minutes?: number;
           notifications_enabled?: boolean;
           updated_at?: string;
         };
@@ -31,6 +35,8 @@ export type Database = {
           created_at?: string;
           default_navigation_app?: string;
           driver_id?: string;
+          first_ride_summary_enabled?: boolean;
+          first_ride_summary_lead_time_minutes?: number;
           notifications_enabled?: boolean;
           updated_at?: string;
         };
