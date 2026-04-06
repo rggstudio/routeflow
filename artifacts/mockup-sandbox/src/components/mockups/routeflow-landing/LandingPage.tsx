@@ -150,9 +150,14 @@ export function LandingPage() {
 
               <div className="mt-8 flex items-center gap-4 text-sm text-slate-400">
                 <div className="flex -space-x-2">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="w-8 h-8 rounded-full border-2 border-slate-950 bg-slate-800 flex items-center justify-center overflow-hidden">
-                      <img src={`https://i.pravatar.cc/100?img=${i + 10}`} alt="Driver" className="w-full h-full object-cover opacity-80" />
+                  {[
+                    { initials: "DM", color: "bg-cyan-700" },
+                    { initials: "LK", color: "bg-blue-700" },
+                    { initials: "JT", color: "bg-indigo-700" },
+                    { initials: "RB", color: "bg-teal-700" }
+                  ].map((avatar, i) => (
+                    <div key={i} className={`w-8 h-8 rounded-full border-2 border-slate-950 ${avatar.color} flex items-center justify-center text-[9px] font-bold text-white`}>
+                      {avatar.initials}
                     </div>
                   ))}
                 </div>
