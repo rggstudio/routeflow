@@ -1,36 +1,3 @@
-alter table public.profiles
-  add column if not exists is_admin boolean not null default false;
-
-update public.profiles p
-set is_admin = true
-where lower(coalesce((auth.jwt()->>'email'), '')) = 'shopmaster73@gmail.com'
-   or exists (
-     select 1
-     from auth.users u
-     where u.id = p.id
-       and lower(coalesce(u.email, '')) = 'shopmaster73@gmail.com'
-   );
-
-create or replace function public.current_user_is_admin()
-returns boolean
-language sql
-security definer
-stable
-set search_path = public, auth
-as $$
-  select exists (
-    select 1
-    from public.profiles p
-    where p.id = auth.uid()
-      and (
-        coalesce(p.is_admin, false)
-        or lower(coalesce(auth.jwt()->>'email', '')) = 'shopmaster73@gmail.com'
-      )
-  );
-$$;
-
-grant execute on function public.current_user_is_admin() to authenticated;
-
 create or replace function public.admin_driver_stats(
   report_date date default timezone('utc', now())::date
 )
