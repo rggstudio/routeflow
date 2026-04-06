@@ -72,9 +72,7 @@ export function LandingPage() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-cyan-500 flex items-center justify-center text-slate-950 p-1.5">
-                <IconCar />
-              </div>
+              <img src={`${import.meta.env.BASE_URL}images/routeflow-logo.png`} alt="RouteFlow" className="w-9 h-9 rounded-xl" />
               <span className="text-xl font-bold tracking-tight">RouteFlow</span>
             </div>
 
@@ -172,12 +170,11 @@ export function LandingPage() {
 
             <div className="relative lg:ml-auto">
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-cyan-500/20 blur-[120px] rounded-full pointer-events-none" />
-              <div className="relative rounded-2xl overflow-hidden border border-slate-800 shadow-2xl shadow-cyan-900/20 transform -rotate-2 hover:rotate-0 transition-transform duration-500">
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 to-transparent z-10" />
+              <div className="relative">
                 <img
-                  src={`${import.meta.env.BASE_URL}images/routeflow-hero.png`}
-                  alt="RouteFlow App Interface showing earnings and ride management for independent transportation drivers"
-                  className="w-full h-auto object-cover relative z-0"
+                  src={`${import.meta.env.BASE_URL}images/routeflow-hero-mockup.webp`}
+                  alt="RouteFlow Daily Command Center showing rides and earnings for independent transportation drivers"
+                  className="w-full h-auto object-contain drop-shadow-2xl"
                 />
               </div>
             </div>
@@ -250,7 +247,7 @@ export function LandingPage() {
               </ul>
 
               <button className="mt-10 bg-white text-slate-950 hover:bg-slate-200 rounded-full px-8 py-4 text-lg font-semibold transition-colors">
-                Start your 14-day free trial
+                Get Started — It's Free
               </button>
             </div>
 
@@ -302,7 +299,7 @@ export function LandingPage() {
           <div className="grid md:grid-cols-3 gap-6">
             {[
               {
-                quote: "The quick SMS feature alone is worth it. One tap to let my airport pickups know I've arrived in the cell phone lot. No more texting and driving.",
+                quote: "No more looking through texts to see when and where my next pickup is, it's right there on my Daily Command Center. Saves me time and frustration.",
                 name: "David M.",
                 role: "Executive Black Car Driver"
               },
@@ -370,9 +367,7 @@ export function LandingPage() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded bg-cyan-500 flex items-center justify-center text-slate-950 p-1">
-                <IconCar />
-              </div>
+              <img src={`${import.meta.env.BASE_URL}images/routeflow-logo.png`} alt="RouteFlow" className="w-7 h-7 rounded-lg" />
               <span className="text-lg font-bold">RouteFlow</span>
             </div>
 
