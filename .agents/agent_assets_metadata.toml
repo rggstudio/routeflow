@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "9PkLPYBeiCgpD7pgUNa_b"
+uri = "file://artifacts/mockup-sandbox/public/images/routeflow-hero.png"
+type = "image"
+title = "RouteFlow app hero visual"
