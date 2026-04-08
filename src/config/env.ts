@@ -1,6 +1,24 @@
 import Constants from 'expo-constants';
 
-const extra = (Constants.expoConfig?.extra ?? {}) as Record<string, string>;
+type ExpoManifestLike = {
+  extra?: Record<string, string>;
+};
+
+type ConstantsWithManifestFallbacks = typeof Constants & {
+  manifest?: ExpoManifestLike | null;
+  manifest2?: {
+    extra?: Record<string, string>;
+  } | null;
+};
+
+const constantsWithFallbacks = Constants as ConstantsWithManifestFallbacks;
+
+const extra = (
+  Constants.expoConfig?.extra ??
+  constantsWithFallbacks.manifest2?.extra ??
+  constantsWithFallbacks.manifest?.extra ??
+  {}
+) as Record<string, string>;
 
 const rawSupabaseUrl = (
   (process.env.EXPO_PUBLIC_SUPABASE_URL as string | undefined) ||
