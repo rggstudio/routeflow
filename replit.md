@@ -57,6 +57,8 @@ Requires Supabase credentials (optional - app gracefully handles missing config)
 
 ## Notable Implementation Notes
 
-- `app.config.js` replaces `app.json` (deleted). All version/version reads use `Constants.expoConfig` rather than `require('../../app.json')`.
+- `app.config.js` is the single source of truth for Expo config (no `app.json`). All config is inlined; env vars are injected via `process.env.EXPO_PUBLIC_*`. Passes all 17/17 `expo-doctor` checks.
+- Newly installed packages (SDK 54 compatible): `expo-font` (peer dep of `@expo/vector-icons`), `expo-system-ui` (needed for `userInterfaceStyle: automatic` on Android), `react-native-worklets` (peer dep of `react-native-reanimated`).
+- Android `package` identifier added: `app.replit.routeflow_rgg`.
 - `AddressAutocomplete` component (`src/components/AddressAutocomplete.tsx`) uses Mapbox `/suggest` + `/retrieve` endpoints with 300 ms debounce and a per-form-session UUID token.
 - DB audit trigger bug fix: `supabase/migrations/202604030001_fix_audit_fk_on_delete.sql` must be applied via Supabase SQL Editor (sets FK to NULL on delete so audit triggers don't reference already-deleted rows).

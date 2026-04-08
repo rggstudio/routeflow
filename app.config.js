@@ -1,19 +1,68 @@
-const appJson = require('./app.json');
-
 module.exports = () => {
-  const expo = appJson.expo ?? {};
-
   return {
-    ...appJson,
     expo: {
-      ...expo,
+      name: "RouteFlow",
+      slug: "routeflow",
+      owner: "replit-private-4b2a0525-4f8e-49bd-80fe-1270efa35a94",
+      version: "1.0.0",
+      orientation: "portrait",
+      icon: "./assets/icon.png",
+      userInterfaceStyle: "automatic",
+      newArchEnabled: true,
+      scheme: "routeflow",
+      splash: {
+        image: "./assets/splash-icon.png",
+        resizeMode: "contain",
+        backgroundColor: "#ffffff",
+      },
+      ios: {
+        supportsTablet: true,
+        bundleIdentifier: "app.replit.routeflow-rgg",
+        appleTeamId: "5BNC3BC2C6",
+        usesAppleSignIn: true,
+        infoPlist: {
+          ITSAppUsesNonExemptEncryption: false,
+        },
+      },
+      android: {
+        package: "app.replit.routeflow_rgg",
+        adaptiveIcon: {
+          foregroundImage: "./assets/adaptive-icon.png",
+          backgroundColor: "#ffffff",
+        },
+        edgeToEdgeEnabled: true,
+        predictiveBackGestureEnabled: false,
+      },
+      web: {
+        favicon: "./assets/favicon.png",
+      },
+      plugins: [
+        "expo-font",
+        "expo-apple-authentication",
+        "expo-notifications",
+        "expo-secure-store",
+        "@react-native-community/datetimepicker",
+        "expo-web-browser",
+        [
+          "@react-native-google-signin/google-signin",
+          {
+            iosUrlScheme:
+              "com.googleusercontent.apps.809975300407-dibhscai7ejtv378rtcotdo71lrja15t",
+          },
+        ],
+      ],
       extra: {
-        ...(expo.extra ?? {}),
-        supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? '',
-        supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
-        mapboxKey: process.env.EXPO_PUBLIC_MAPBOX_KEY ?? process.env.MAPBOX_PUBLIC_KEY ?? '',
-        googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? '',
-        siteUrl: process.env.EXPO_PUBLIC_SITE_URL ?? '',
+        eas: {
+          projectId: "3eb6b847-5748-4435-9668-78c92dc2d56b",
+        },
+        supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? "",
+        supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "",
+        mapboxKey:
+          process.env.EXPO_PUBLIC_MAPBOX_KEY ??
+          process.env.MAPBOX_PUBLIC_KEY ??
+          "",
+        googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? "",
+        siteUrl: process.env.EXPO_PUBLIC_SITE_URL ?? "",
       },
     },
   };
