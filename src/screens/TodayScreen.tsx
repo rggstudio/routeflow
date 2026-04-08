@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { ReactNode, useEffect, useState } from 'react';
+import { Alert, Pressable, Text, View } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { RideCard } from '@/components/RideCard';
 import { ActionButton, Screen, SectionCard, StatTile } from '@/components/ui';
 import {
+  combineDateAndTime,
   formatTime,
   getLongDateLabel,
   getRelativeCountdown,
@@ -13,6 +14,7 @@ import {
 } from '@/lib/date';
 import { buildQuickMessage, openNavigation, sendQuickMessage } from '@/lib/routeFlow';
 import { useRouteFlow } from '@/providers/RouteFlowProvider';
+import { useToast } from '@/providers/ToastProvider';
 import { RootStackParamList } from '@/types/navigation';
 import { RideOccurrenceView } from '@/types/ride';
 
@@ -24,10 +26,14 @@ function getNextRideEyebrow(isoDate: string, time: string, now: Date) {
   const countdown = getRelativeCountdown(isoDate, time, now);
 
   if (countdown.startsWith('Starts in ')) {
-    return `Next ride in ${countdown.replace('Starts in ', '')}`;
+    return 'Next ride in ' + countdown.replace('Starts in ', '');
   }
 
-  return `Next ride ${countdown.toLowerCase()}`;
+  return 'Next ride ' + countdown.toLowerCase();
+}
+
+function isRideStatusUpdateOverdue(ride: RideOccurrenceView, now: Date) {
+  return combineDateAndTime(ride.occurrence.serviceDate, ride.activeLeg.pickupTime).getTime() < now.getTime();
 }
 
 type HomeRideSpotlightProps = {
@@ -43,7 +49,8 @@ type HomeRideSpotlightProps = {
     icon?: keyof typeof Ionicons.glyphMap;
     onPress: () => void;
   };
-  statusTone?: 'default' | 'in_progress';
+  footerActions?: ReactNode;
+  statusTone?: 'default' | 'in_progress' | 'attention';
 };
 
 function HomeRideSpotlight({
@@ -54,62 +61,71 @@ function HomeRideSpotlight({
   todaysRides,
   onNavigate,
   secondaryAction,
+  footerActions,
   statusTone = 'default',
 }: HomeRideSpotlightProps) {
-  const wrapperClassName =
-    statusTone === 'in_progress'
-      ? 'mb-4 overflow-hidden rounded-[28px] border border-emerald-400/45 bg-emerald-950/70'
+  const isInProgress = statusTone === 'in_progress';
+  const isAttention = statusTone === 'attention';
+  const wrapperClassName = isInProgress
+    ? 'mb-4 overflow-hidden rounded-[28px] border border-emerald-400/45 bg-emerald-950/70'
+    : isAttention
+      ? 'mb-4 overflow-hidden rounded-[28px] border border-amber-300/55 bg-amber-950/35'
       : '';
-  const cardClassName =
-    statusTone === 'in_progress' ? 'mb-0 border-transparent bg-transparent' : undefined;
+  const wrapperStyle = isAttention
+    ? {
+        shadowColor: '#facc15',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.32,
+        shadowRadius: 24,
+        elevation: 10,
+      }
+    : undefined;
+  const cardClassName = isInProgress || isAttention ? 'mb-0 border-transparent bg-transparent' : undefined;
+  const pickupIconColor = isAttention ? '#fcd34d' : '#bbf7d0';
+  const dropoffIconColor = isAttention ? '#fde68a' : '#dcfce7';
+  const dropoffTextClassName = isAttention
+    ? 'flex-1 text-sm leading-6 text-amber-100/90'
+    : 'flex-1 text-sm leading-6 text-emerald-100/90';
+  const dateIconColor = isInProgress ? '#bbf7d0' : isAttention ? '#fcd34d' : '#67e8f9';
+  const dateTextClassName = isInProgress
+    ? 'text-base font-semibold text-emerald-100'
+    : isAttention
+      ? 'text-base font-semibold text-amber-100'
+      : 'text-base font-semibold text-cyan-200';
+  const rideIndexTextClassName = isInProgress
+    ? 'text-sm text-emerald-100/85'
+    : isAttention
+      ? 'text-sm text-amber-100/85'
+      : 'text-sm text-slate-400';
+  const rideIndexIconColor = isInProgress ? '#bbf7d0' : isAttention ? '#fcd34d' : '#64748b';
 
   const cardContent = (
     <SectionCard eyebrow={eyebrow} title={title} className={cardClassName}>
       <View className="gap-1.5">
         <View className="flex-row gap-2">
           <View className="h-6 justify-center">
-            <Ionicons name="location-outline" size={15} color="#bbf7d0" />
+            <Ionicons name="location-outline" size={15} color={pickupIconColor} />
           </View>
           <Text className="flex-1 text-sm leading-6 text-slate-100">{ride.activeLeg.pickupAddress}</Text>
         </View>
         <View className="flex-row gap-2">
           <View className="h-6 justify-center">
-            <Ionicons name="flag-outline" size={15} color="#dcfce7" />
+            <Ionicons name="flag-outline" size={15} color={dropoffIconColor} />
           </View>
-          <Text className="flex-1 text-sm leading-6 text-emerald-100/90">{ride.activeLeg.dropoffAddress}</Text>
+          <Text className={dropoffTextClassName}>{ride.activeLeg.dropoffAddress}</Text>
         </View>
       </View>
 
       <View className="mt-4 flex-row items-center gap-2">
-        <Ionicons
-          name="calendar-outline"
-          size={15}
-          color={statusTone === 'in_progress' ? '#bbf7d0' : '#67e8f9'}
-        />
-        <Text
-          className={
-            statusTone === 'in_progress'
-              ? 'text-base font-semibold text-emerald-100'
-              : 'text-base font-semibold text-cyan-200'
-          }
-        >
-          {getLongDateLabel(ride.occurrence.serviceDate)}
-        </Text>
+        <Ionicons name="calendar-outline" size={15} color={dateIconColor} />
+        <Text className={dateTextClassName}>{getLongDateLabel(ride.occurrence.serviceDate)}</Text>
       </View>
 
       {ride.occurrence.serviceDate === today ? (
         <View className="mt-2 flex-row items-center gap-2">
-          <Ionicons
-            name="layers-outline"
-            size={14}
-            color={statusTone === 'in_progress' ? '#bbf7d0' : '#64748b'}
-          />
-          <Text
-            className={
-              statusTone === 'in_progress' ? 'text-sm text-emerald-100/85' : 'text-sm text-slate-400'
-            }
-          >
-            {`Ride ${Math.max(1, todaysRides.findIndex((item) => item.occurrence.id === ride.occurrence.id) + 1)} of ${Math.max(1, todaysRides.length)}`}
+          <Ionicons name="layers-outline" size={14} color={rideIndexIconColor} />
+          <Text className={rideIndexTextClassName}>
+            {'Ride ' + Math.max(1, todaysRides.findIndex((item) => item.occurrence.id === ride.occurrence.id) + 1) + ' of ' + Math.max(1, todaysRides.length)}
           </Text>
         </View>
       ) : null}
@@ -122,54 +138,78 @@ function HomeRideSpotlight({
           icon={secondaryAction.icon}
           onPress={secondaryAction.onPress}
         />
-        <View className="flex-row gap-2">
-          <View className="flex-1">
-            <ActionButton
-              icon="car-outline"
-              onPress={() => sendQuickMessage(ride.group.phone, buildQuickMessage('on_my_way', ride))}
-            />
+        {footerActions ?? (
+          <View className="flex-row gap-2">
+            <View className="flex-1">
+              <ActionButton
+                icon="car-outline"
+                onPress={() => sendQuickMessage(ride.group.phone, buildQuickMessage('on_my_way', ride))}
+              />
+            </View>
+            <View className="flex-1">
+              <ActionButton
+                icon="time-outline"
+                onPress={() =>
+                  sendQuickMessage(ride.group.phone, buildQuickMessage('five_min_away', ride))
+                }
+              />
+            </View>
+            <View className="flex-1">
+              <ActionButton
+                icon="checkmark-circle-outline"
+                onPress={() => sendQuickMessage(ride.group.phone, buildQuickMessage('picked_up', ride))}
+              />
+            </View>
           </View>
-          <View className="flex-1">
-            <ActionButton
-              icon="time-outline"
-              onPress={() =>
-                sendQuickMessage(ride.group.phone, buildQuickMessage('five_min_away', ride))
-              }
-            />
-          </View>
-          <View className="flex-1">
-            <ActionButton
-              icon="checkmark-circle-outline"
-              onPress={() => sendQuickMessage(ride.group.phone, buildQuickMessage('picked_up', ride))}
-            />
-          </View>
-        </View>
+        )}
       </View>
     </SectionCard>
   );
 
-  if (statusTone === 'in_progress') {
-    return <View className={wrapperClassName}>{cardContent}</View>;
+  if (isInProgress || isAttention) {
+    return (
+      <View className={wrapperClassName} style={wrapperStyle}>
+        {cardContent}
+      </View>
+    );
   }
 
   return cardContent;
 }
 
 export function TodayScreen({ navigation }: Props) {
-  const { state, getOccurrencesForDate, getCanceledOccurrencesForDate, getUpcomingOccurrences, updateOccurrenceStatus } =
-    useRouteFlow();
+  const {
+    state,
+    getOccurrencesForDate,
+    getCanceledOccurrencesForDate,
+    getUpcomingOccurrences,
+    updateOccurrenceStatus,
+    cancelOccurrence,
+    cancelOccurrenceWithPay,
+  } = useRouteFlow();
+  const { showToast } = useToast();
   const [now, setNow] = useState(() => new Date());
   const today = todayIso();
   const todaysRides = getOccurrencesForDate(today);
   const canceledTodayRides = getCanceledOccurrencesForDate(today);
   const upcomingRides = getUpcomingOccurrences();
   const inProgressRide = todaysRides.find((ride) => ride.occurrence.status === 'in_progress') ?? null;
+  const overdueScheduledRide =
+    todaysRides.find(
+      (ride) =>
+        ride.occurrence.status === 'scheduled' &&
+        ride.occurrence.id !== inProgressRide?.occurrence.id &&
+        isRideStatusUpdateOverdue(ride, now)
+    ) ?? null;
   const nextRide =
+    overdueScheduledRide ??
     upcomingRides.find(
       (ride) =>
         ride.occurrence.status === 'scheduled' &&
         ride.occurrence.id !== inProgressRide?.occurrence.id
-    ) ?? null;
+    ) ??
+    null;
+  const isNextRideOverdue = nextRide ? isRideStatusUpdateOverdue(nextRide, now) : false;
   const todaysRideLabel = todaysRides.length === 1 ? 'ride' : 'rides';
   const laterTodayRides = todaysRides.filter(
     (ride) => ride.occurrence.status !== 'completed' && ride.occurrence.status !== 'in_progress'
@@ -186,6 +226,58 @@ export function TodayScreen({ navigation }: Props) {
     };
   }, []);
 
+  const runRideAction = async (
+    action: () => Promise<void>,
+    successTitle: string,
+    errorTitle: string,
+    successMessage?: string
+  ) => {
+    try {
+      await action();
+      showToast({ title: successTitle, message: successMessage });
+    } catch (error) {
+      Alert.alert(errorTitle, error instanceof Error ? error.message : 'Try again.');
+    }
+  };
+
+  const confirmCancelRide = (ride: RideOccurrenceView) => {
+    Alert.alert('Cancel ride', 'This ride will be marked canceled.', [
+      { text: 'Keep it', style: 'cancel' },
+      {
+        text: 'Cancel ride',
+        style: 'destructive',
+        onPress: () =>
+          void runRideAction(
+            () => cancelOccurrence(ride.occurrence.id),
+            'Ride canceled',
+            'Cancel ride failed',
+            ride.group.riderName + ' was marked canceled.'
+          ),
+      },
+    ]);
+  };
+
+  const confirmCancelRideWithPay = (ride: RideOccurrenceView) => {
+    Alert.alert(
+      'Cancel ride with pay',
+      'This ride will be marked canceled, but the payment will still count.',
+      [
+        { text: 'Keep it', style: 'cancel' },
+        {
+          text: 'Cancel with pay',
+          style: 'destructive',
+          onPress: () =>
+            void runRideAction(
+              () => cancelOccurrenceWithPay(ride.occurrence.id),
+              'Ride canceled with pay',
+              'Cancel with pay failed',
+              ride.group.riderName + ' was canceled and payment was kept.'
+            ),
+        },
+      ]
+    );
+  };
+
   return (
     <Screen>
       <View className="mb-6">
@@ -201,18 +293,10 @@ export function TodayScreen({ navigation }: Props) {
       </View>
 
       <View className="mb-4 flex-row gap-3">
-        <StatTile label="Today" value={`${todaysRides.length} ${todaysRideLabel}`} />
-        <StatTile
-          label="Completed"
-          value={`${completedTodayRides.length}`}
-          tone="positive"
-        />
+        <StatTile label="Today" value={String(todaysRides.length) + ' ' + todaysRideLabel} />
+        <StatTile label="Completed" value={String(completedTodayRides.length)} tone="positive" />
         {canceledTodayRides.length > 0 ? (
-          <StatTile
-            label="Canceled"
-            value={`${canceledTodayRides.length}`}
-            tone="negative"
-          />
+          <StatTile label="Canceled" value={String(canceledTodayRides.length)} tone="negative" />
         ) : null}
       </View>
 
@@ -221,7 +305,7 @@ export function TodayScreen({ navigation }: Props) {
           ride={inProgressRide}
           statusTone="in_progress"
           eyebrow="In progress"
-          title={`${inProgressRide.group.riderName} - ${formatTime(inProgressRide.activeLeg.pickupTime)}`}
+          title={inProgressRide.group.riderName + ' - ' + formatTime(inProgressRide.activeLeg.pickupTime)}
           today={today}
           todaysRides={todaysRides}
           onNavigate={() => openNavigation(inProgressRide, state.preferences)}
@@ -237,8 +321,13 @@ export function TodayScreen({ navigation }: Props) {
       {nextRide ? (
         <HomeRideSpotlight
           ride={nextRide}
-          eyebrow={getNextRideEyebrow(nextRide.occurrence.serviceDate, nextRide.activeLeg.pickupTime, now)}
-          title={`${nextRide.group.riderName} - ${formatTime(nextRide.activeLeg.pickupTime)}`}
+          statusTone={isNextRideOverdue ? 'attention' : 'default'}
+          eyebrow={
+            isNextRideOverdue
+              ? 'Update the ride status'
+              : getNextRideEyebrow(nextRide.occurrence.serviceDate, nextRide.activeLeg.pickupTime, now)
+          }
+          title={nextRide.group.riderName + ' - ' + formatTime(nextRide.activeLeg.pickupTime)}
           today={today}
           todaysRides={todaysRides}
           onNavigate={() => openNavigation(nextRide, state.preferences)}
@@ -248,6 +337,22 @@ export function TodayScreen({ navigation }: Props) {
             icon: 'checkmark-circle-outline',
             onPress: () => void updateOccurrenceStatus(nextRide.occurrence.id, 'in_progress'),
           }}
+          footerActions={
+            isNextRideOverdue ? (
+              <View className="flex-row gap-2">
+                <View className="flex-1">
+                  <ActionButton label="CANCEL RIDE" kind="danger" onPress={() => confirmCancelRide(nextRide)} />
+                </View>
+                <View className="flex-1">
+                  <ActionButton
+                    label="CANCEL RIDE W/ PAY"
+                    kind="danger"
+                    onPress={() => confirmCancelRideWithPay(nextRide)}
+                  />
+                </View>
+              </View>
+            ) : undefined
+          }
         />
       ) : (
         <SectionCard eyebrow="All clear" title="No next ride">
