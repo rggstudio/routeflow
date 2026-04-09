@@ -345,7 +345,7 @@ export function TodayScreen({ navigation }: Props) {
                 </View>
                 <View className="flex-1">
                   <ActionButton
-                    label="CANCEL RIDE W/ PAY"
+                    label="CANCEL W/ PAY"
                     kind="danger"
                     onPress={() => confirmCancelRideWithPay(nextRide)}
                   />
