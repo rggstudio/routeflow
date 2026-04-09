@@ -3,7 +3,7 @@ module.exports = () => {
     expo: {
       name: "RouteFlow",
       slug: "routeflow",
-      owner: "replit-private-4b2a0525-4f8e-49bd-80fe-1270efa35a94",
+      owner: "rggstudio",
       version: "1.0.0",
       orientation: "portrait",
       icon: "./assets/icon.png",
@@ -20,6 +20,7 @@ module.exports = () => {
         bundleIdentifier: "app.replit.routeflow-rgg",
         appleTeamId: "5BNC3BC2C6",
         usesAppleSignIn: true,
+        buildNumber: "2",
         infoPlist: {
           ITSAppUsesNonExemptEncryption: false,
         },
@@ -53,7 +54,7 @@ module.exports = () => {
       ],
       extra: {
         eas: {
-          projectId: "3eb6b847-5748-4435-9668-78c92dc2d56b",
+          projectId: "e3bbb904-9642-4dcd-97e1-a24d3db4c788",
         },
         supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? "",
         supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "",

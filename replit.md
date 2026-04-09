@@ -57,7 +57,7 @@ Requires Supabase credentials (optional - app gracefully handles missing config)
 
 ## EAS Build & App Store Submission
 
-EAS CLI is installed as a dev dependency (`node_modules/.bin/eas`). Authenticated as `rggstudio` (raymond@rggstudio.com) via `EXPO_TOKEN`.
+EAS CLI is installed as a dev dependency (`node_modules/.bin/eas`). Authenticated as `rggstudio` (raymond@rggstudio.com) via `EXPO_TOKEN`. EAS project: `@rggstudio/routeflow` (ID: `e3bbb904-9642-4dcd-97e1-a24d3db4c788`).
 
 **Apple credentials configured in `eas.json` submit.production.ios:**
 - `appleTeamId`: `5BNC3BC2C6`
