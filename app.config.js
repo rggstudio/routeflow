@@ -4,7 +4,7 @@ module.exports = () => {
       name: "RouteFlow",
       slug: "routeflow",
       owner: "rggstudio",
-      version: "1.0.6",
+      version: "1.0.7",
       orientation: "portrait",
       icon: "./assets/icon.png",
       userInterfaceStyle: "automatic",
@@ -20,7 +20,7 @@ module.exports = () => {
         bundleIdentifier: "app.replit.routeflow-rgg",
         appleTeamId: "5BNC3BC2C6",
         usesAppleSignIn: true,
-        buildNumber: "6",
+        buildNumber: "7",
         infoPlist: {
           ITSAppUsesNonExemptEncryption: false,
         },
@@ -38,7 +38,6 @@ module.exports = () => {
         favicon: "./assets/favicon.png",
       },
       plugins: [
-        "expo-font",
         "expo-apple-authentication",
         "expo-notifications",
         "expo-secure-store",
