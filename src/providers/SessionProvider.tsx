@@ -35,6 +35,7 @@ WebBrowser.maybeCompleteAuthSession();
 if (Platform.OS !== 'web' && env.isGoogleSignInConfigured && GoogleSignin) {
   GoogleSignin.configure({
     iosClientId: env.googleIosClientId,
+    webClientId: env.googleWebClientId || undefined,
     scopes: ['email', 'profile'],
   });
 }

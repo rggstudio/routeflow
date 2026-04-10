@@ -4,7 +4,7 @@ module.exports = () => {
       name: "RouteFlow",
       slug: "routeflow",
       owner: "rggstudio",
-      version: "1.0.7",
+      version: "1.0.8",
       orientation: "portrait",
       icon: "./assets/icon.png",
       userInterfaceStyle: "automatic",
@@ -20,7 +20,7 @@ module.exports = () => {
         bundleIdentifier: "app.replit.routeflow-rgg",
         appleTeamId: "5BNC3BC2C6",
         usesAppleSignIn: true,
-        buildNumber: "7",
+        buildNumber: "8",
         infoPlist: {
           ITSAppUsesNonExemptEncryption: false,
         },
@@ -62,6 +62,7 @@ module.exports = () => {
           process.env.MAPBOX_PUBLIC_KEY ??
           "",
         googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? "",
+        googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? "",
         siteUrl: process.env.EXPO_PUBLIC_SITE_URL ?? "",
       },
     },
