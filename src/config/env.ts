@@ -44,6 +44,12 @@ const rawGoogleIosClientId = (
   ''
 ).trim();
 
+const rawGoogleWebClientId = (
+  (process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID as string | undefined) ||
+  extra.googleWebClientId ||
+  ''
+).trim();
+
 const rawSiteUrl = (
   (process.env.EXPO_PUBLIC_SITE_URL as string | undefined) ||
   extra.siteUrl ||
@@ -74,6 +80,7 @@ export const env = {
   mapboxKey: rawMapboxKey,
   isMapboxConfigured: Boolean(rawMapboxKey),
   googleIosClientId: rawGoogleIosClientId,
+  googleWebClientId: rawGoogleWebClientId,
   isGoogleSignInConfigured: isRealClientId(rawGoogleIosClientId),
   siteUrl: rawSiteUrl,
 };
