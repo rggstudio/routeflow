@@ -4,7 +4,7 @@ module.exports = () => {
       name: "RouteFlow",
       slug: "routeflow",
       owner: "rggstudio",
-      version: "1.0.8",
+      version: "1.0.7",
       orientation: "portrait",
       icon: "./assets/icon.png",
       userInterfaceStyle: "automatic",
@@ -20,7 +20,7 @@ module.exports = () => {
         bundleIdentifier: "app.replit.routeflow-rgg",
         appleTeamId: "5BNC3BC2C6",
         usesAppleSignIn: true,
-        buildNumber: "8",
+        buildNumber: "9",
         infoPlist: {
           ITSAppUsesNonExemptEncryption: false,
         },
