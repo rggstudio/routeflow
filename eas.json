@@ -14,6 +14,13 @@
     "production": {
       "autoIncrement": true,
       "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://eqaofmamoopijpbddorl.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_i-FvyYDOxi1WoEsT3GDU3Q_Xq1dY0fU",
+        "EXPO_PUBLIC_MAPBOX_KEY": "pk.eyJ1Ijoicmdnc3R1ZGlvIiwiYSI6ImNtbmpqc2pxOTBvMXgyc29nM3bleWFvNjUifQ.cGULfA6MEeZNd4_EVEojbg",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "809975300407-dibhscai7ejtv378rtcotdo71lrja15t.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "809975300407-oij4ogmf3rnc0edn7pgu3rubvcnc9pck.apps.googleusercontent.com"
+      },
       "ios": {
         "image": "latest"
       }
