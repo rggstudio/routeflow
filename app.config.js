@@ -20,7 +20,7 @@ module.exports = () => {
         bundleIdentifier: "app.replit.routeflow-rgg",
         appleTeamId: "5BNC3BC2C6",
         usesAppleSignIn: true,
-        buildNumber: "7",
+        buildNumber: "10",
         infoPlist: {
           ITSAppUsesNonExemptEncryption: false,
         },

@@ -230,7 +230,15 @@ export function SessionProvider({ children }: SessionProviderProps) {
         }
 
         // ── Google native SDK (custom dev build / production) ─────────────────
-        if (provider === 'google' && Platform.OS !== 'web' && GoogleSignin && env.isGoogleSignInConfigured) {
+        // Google native sign-in stays on Android. On iOS, Google may return an ID token
+        // with a nonce claim but the native SDK does not expose the raw nonce to JS, so
+        // Supabase rejects signInWithIdToken. We use the browser OAuth flow on iOS instead.
+        if (
+          provider === 'google' &&
+          Platform.OS === 'android' &&
+          GoogleSignin &&
+          env.isGoogleSignInConfigured
+        ) {
           try {
             await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
             const response = await GoogleSignin.signIn();
