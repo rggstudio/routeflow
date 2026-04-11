@@ -2,18 +2,18 @@
   "name": "routeflow",
   "version": "1.0.0",
   "main": "index.ts",
- "scripts": {
-  "start": "expo start",
-  "android": "expo start --android",
-  "ios": "expo start --ios",
-  "web": "expo start --web",
-  "lint": "expo lint",
-  "typecheck": "tsc --noEmit",
-  "doctor": "npx expo-doctor",
-  "build:ios:production": "eas build --platform ios --profile production",
-  "build:ios:local": "eas build --platform ios --profile production --local",
-  "submit:ios:production": "eas submit --platform ios --profile production"
-},
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "lint": "expo lint",
+    "typecheck": "tsc --noEmit",
+    "doctor": "npx expo-doctor",
+    "build:ios:production": "npx eas-cli build --platform ios --profile production",
+    "build:ios:local": "npx eas-cli build --platform ios --profile development --local",
+    "submit:ios:production": "npx eas-cli submit --platform ios --profile production --latest"
+  },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
     "@expo/ngrok": "^4.1.3",
@@ -59,7 +59,6 @@
     "@types/react": "~19.1.0",
     "babel-plugin-module-resolver": "^5.0.3",
     "babel-preset-expo": "~54.0.10",
-    "eas-cli": "^18.5.0",
     "typescript": "~5.9.2"
   },
   "private": true

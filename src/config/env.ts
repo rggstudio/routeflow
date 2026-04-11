@@ -22,36 +22,42 @@ const extra = (
 
 const rawSupabaseUrl = (
   (process.env.EXPO_PUBLIC_SUPABASE_URL as string | undefined) ||
+  extra.EXPO_PUBLIC_SUPABASE_URL ||
   extra.supabaseUrl ||
   ''
 ).trim();
 
 const rawSupabaseAnonKey = (
   (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string | undefined) ||
+  extra.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
   extra.supabaseAnonKey ||
   ''
 ).trim();
 
 const rawMapboxKey = (
   (process.env.EXPO_PUBLIC_MAPBOX_KEY as string | undefined) ||
+  extra.EXPO_PUBLIC_MAPBOX_KEY ||
   extra.mapboxKey ||
   ''
 ).trim();
 
 const rawGoogleIosClientId = (
   (process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID as string | undefined) ||
+  extra.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ||
   extra.googleIosClientId ||
   ''
 ).trim();
 
 const rawGoogleWebClientId = (
   (process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID as string | undefined) ||
+  extra.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
   extra.googleWebClientId ||
   ''
 ).trim();
 
 const rawSiteUrl = (
   (process.env.EXPO_PUBLIC_SITE_URL as string | undefined) ||
+  extra.EXPO_PUBLIC_SITE_URL ||
   extra.siteUrl ||
   ''
 ).trim();

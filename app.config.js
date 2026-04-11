@@ -55,15 +55,18 @@ module.exports = () => {
         eas: {
           projectId: "e3bbb904-9642-4dcd-97e1-a24d3db4c788",
         },
-        supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? "",
-        supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "",
-        mapboxKey:
+        EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL ?? "",
+        EXPO_PUBLIC_SUPABASE_ANON_KEY:
+          process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "",
+        EXPO_PUBLIC_MAPBOX_KEY:
           process.env.EXPO_PUBLIC_MAPBOX_KEY ??
           process.env.MAPBOX_PUBLIC_KEY ??
           "",
-        googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? "",
-        googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? "",
-        siteUrl: process.env.EXPO_PUBLIC_SITE_URL ?? "",
+        EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID:
+          process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? "",
+        EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID:
+          process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? "",
+        EXPO_PUBLIC_SITE_URL: process.env.EXPO_PUBLIC_SITE_URL ?? "",
       },
     },
   };
