@@ -28,7 +28,9 @@ export async function openNavigation(view: RideOccurrenceView, preferences: Driv
   const destination = view.activeLeg.dropoffAddress;
 
   const urls: Record<NavigationApp, string> = {
-    waze: `https://waze.com/ul?ll=${encode(destination)}&navigate=yes`,
+    // Waze deep links navigate from the driver's current location and do not support
+    // passing a separate start address the way Google Maps and Apple Maps do.
+    waze: `https://waze.com/ul?q=${encode(destination)}&navigate=yes`,
     google_maps: `https://www.google.com/maps/dir/?api=1&origin=${encode(origin)}&destination=${encode(destination)}&travelmode=driving`,
     apple_maps: `http://maps.apple.com/?saddr=${encode(origin)}&daddr=${encode(destination)}`,
   };

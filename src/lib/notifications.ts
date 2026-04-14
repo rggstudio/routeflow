@@ -25,7 +25,7 @@ function isSchedulableRide(ride: RideOccurrenceView) {
 
 function getFirstRideSummaryCandidate(
   rides: RideOccurrenceView[],
-  leadTimeMinutes: number,
+  summaryTime: string,
   now: Date
 ) {
   const ridesByDate = new Map<string, RideOccurrenceView[]>();
@@ -52,8 +52,7 @@ function getFirstRideSummaryCandidate(
       continue;
     }
 
-    const firstRideAt = combineDateAndTime(serviceDate, firstRide.activeLeg.pickupTime);
-    const triggerAt = new Date(firstRideAt.getTime() - leadTimeMinutes * 60 * 1000);
+    const triggerAt = combineDateAndTime(serviceDate, summaryTime);
 
     if (triggerAt <= now) {
       continue;
@@ -142,7 +141,7 @@ export async function syncFirstRideSummaryNotification(
 
   const candidate = getFirstRideSummaryCandidate(
     rides,
-    preferences.firstRideSummaryLeadTimeMinutes,
+    preferences.firstRideSummaryTime,
     new Date()
   );
 

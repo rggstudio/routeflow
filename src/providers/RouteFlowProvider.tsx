@@ -4,18 +4,19 @@ import {
   addDays,
   combineDateAndTime,
   compareTime,
+  DEFAULT_FIRST_RIDE_SUMMARY_TIME,
   fromIsoDate,
-  getDefaultWeekdays,
+  isMorningSummaryTime,
   toIsoDate,
   todayIso,
 } from '@/lib/date';
 import { configureNotificationChannel, syncFirstRideSummaryNotification } from '@/lib/notifications';
+import { getRecurringDatesForWindow, normalizeRecurrenceDays } from '@/lib/recurrence';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/SessionProvider';
 import {
   DriverPreferences,
   DriverProfile,
-  FirstRideSummaryLeadTime,
   RideDraft,
   RideOccurrenceView,
   RideStatus,
@@ -43,6 +44,10 @@ type WeekMetrics = {
   rides: RideOccurrenceView[];
 };
 
+type UpdatePreferencesResult = {
+  warning?: string;
+};
+
 type RouteFlowContextValue = {
   state: RouteFlowState;
   isHydrated: boolean;
@@ -58,9 +63,9 @@ type RouteFlowContextValue = {
   updateOccurrenceStatus: (occurrenceId: string, status: RideStatus) => Promise<void>;
   cancelOccurrence: (occurrenceId: string) => Promise<void>;
   cancelOccurrenceWithPay: (occurrenceId: string) => Promise<void>;
-  cancelSeries: (groupId: string) => Promise<void>;
+  deleteSeriesFromOccurrence: (occurrenceId: string) => Promise<void>;
   updateProfile: (profile: DriverProfile) => Promise<void>;
-  updatePreferences: (preferences: DriverPreferences) => Promise<void>;
+  updatePreferences: (preferences: DriverPreferences) => Promise<UpdatePreferencesResult>;
 };
 
 const RouteFlowContext = createContext<RouteFlowContextValue | undefined>(undefined);
@@ -97,7 +102,7 @@ function createEmptyState(fallbackName = '', isAdmin = false): RouteFlowState {
       defaultNavigationApp: 'google_maps',
       notificationsEnabled: true,
       firstRideSummaryEnabled: true,
-      firstRideSummaryLeadTimeMinutes: 60,
+      firstRideSummaryTime: DEFAULT_FIRST_RIDE_SUMMARY_TIME,
     },
     tripGroups: [],
     tripOccurrences: [],
@@ -115,7 +120,7 @@ function mapProfile(profile: ProfileRow | null, fallbackName = '', isAdminFallba
 }
 
 function mapPreferences(preferences: DriverPreferencesRow | null): DriverPreferences {
-  const leadTime = preferences?.first_ride_summary_lead_time_minutes;
+  const firstRideSummaryTime = preferences?.first_ride_summary_time;
 
   return {
     defaultNavigationApp:
@@ -123,26 +128,38 @@ function mapPreferences(preferences: DriverPreferencesRow | null): DriverPrefere
       'google_maps',
     notificationsEnabled: preferences?.notifications_enabled ?? true,
     firstRideSummaryEnabled: preferences?.first_ride_summary_enabled ?? true,
-    firstRideSummaryLeadTimeMinutes:
-      leadTime === 15 || leadTime === 30 || leadTime === 60
-        ? (leadTime as FirstRideSummaryLeadTime)
-        : 60,
+    firstRideSummaryTime:
+      firstRideSummaryTime && isMorningSummaryTime(firstRideSummaryTime)
+        ? firstRideSummaryTime
+        : DEFAULT_FIRST_RIDE_SUMMARY_TIME,
   };
 }
 
 function mapTripGroups(rows: TripGroupRow[]): TripGroup[] {
-  return rows.map((row) => ({
-    id: row.id,
-    driverId: row.driver_id,
-    riderName: row.rider_name,
-    phone: row.phone ?? '',
-    tripType: row.trip_type as TripGroup['tripType'],
-    payAmount: row.pay_amount,
-    recurrenceType: row.recurrence_type as TripGroup['recurrenceType'],
-    recurrenceDays: row.recurrence_days,
-    notes: row.notes,
-    createdAt: row.created_at,
-  }));
+  return rows.map((row) => {
+    const legacyType = row.recurrence_type;
+    const recurrenceType: TripGroup['recurrenceType'] =
+      legacyType === 'monthly' ? 'monthly' : legacyType === 'none' ? 'none' : 'weekly';
+    const recurrenceDays =
+      legacyType === 'weekday' ? [1, 2, 3, 4, 5] : row.recurrence_days;
+
+    return {
+      id: row.id,
+      driverId: row.driver_id,
+      riderName: row.rider_name,
+      phone: row.phone ?? '',
+      tripType: row.trip_type as TripGroup['tripType'],
+      payAmount: row.pay_amount,
+      recurrenceType,
+      recurrenceInterval: row.recurrence_interval ?? 1,
+      recurrenceDays,
+      recurrenceMonthlyMode: row.recurrence_monthly_mode as TripGroup['recurrenceMonthlyMode'],
+      recurrenceAnchorDate: row.recurrence_anchor_date ?? todayIso(),
+      recurrenceEndDate: row.recurrence_end_date ?? null,
+      notes: row.notes,
+      createdAt: row.created_at,
+    };
+  });
 }
 
 function mapTripOccurrences(rows: TripOccurrenceRow[]): TripOccurrence[] {
@@ -184,8 +201,35 @@ function isOwnerEmail(email?: string | null) {
   return email?.trim().toLowerCase() === OWNER_ADMIN_EMAIL;
 }
 
-function maxIsoDate(left: string, right: string) {
-  return left > right ? left : right;
+function isMissingColumnError(
+  error: { message?: string | null; details?: string | null; hint?: string | null } | null,
+  columnName: string
+) {
+  const haystack = [error?.message, error?.details, error?.hint].filter(Boolean).join(' ').toLowerCase();
+  return haystack.includes(columnName.toLowerCase());
+}
+
+function buildRecurrenceRule(input: {
+  recurrenceType: RideDraft['recurrenceType'];
+  recurrenceInterval: RideDraft['recurrenceInterval'];
+  recurrenceDays: RideDraft['recurrenceDays'];
+  recurrenceMonthlyMode: RideDraft['recurrenceMonthlyMode'];
+  recurrenceAnchorDate: string;
+  recurrenceEndDate?: string | null;
+}) {
+  const recurrenceType = input.recurrenceType;
+
+  return {
+    recurrenceType,
+    recurrenceInterval:
+      recurrenceType === 'weekly' ? (input.recurrenceInterval === 2 ? 2 : 1) : 1,
+    recurrenceDays:
+      recurrenceType === 'weekly' ? normalizeRecurrenceDays(input.recurrenceDays) : [],
+    recurrenceMonthlyMode:
+      recurrenceType === 'monthly' ? input.recurrenceMonthlyMode ?? 'day_of_month' : null,
+    recurrenceAnchorDate: input.recurrenceAnchorDate,
+    recurrenceEndDate: input.recurrenceEndDate ?? null,
+  };
 }
 
 function buildOccurrencesAndLegsForServiceDates(
@@ -241,27 +285,6 @@ function buildOccurrencesAndLegsForServiceDates(
   }
 
   return { occurrences, legs };
-}
-
-function getRecurringDatesForWindow(
-  recurrenceDays: number[],
-  startIso: string,
-  windowDays: number
-) {
-  const allowed = new Set(recurrenceDays);
-  const startDate = fromIsoDate(startIso);
-  const dates: string[] = [];
-
-  for (let offset = 0; offset < windowDays; offset += 1) {
-    const next = addDays(startDate, offset);
-    const day = next.getDay() === 0 ? 7 : next.getDay();
-
-    if (allowed.has(day)) {
-      dates.push(toIsoDate(next));
-    }
-  }
-
-  return dates;
 }
 
 function getSortedViews(state: RouteFlowState) {
@@ -359,22 +382,41 @@ function validateDraft(draft: RideDraft) {
     throw new Error('Return pickup time is required for round trips.');
   }
 
-  if (draft.recurrenceType === 'custom' && draft.recurrenceDays.length === 0) {
-    throw new Error('Choose at least one custom day.');
+  if (draft.recurrenceType === 'weekly' && normalizeRecurrenceDays(draft.recurrenceDays).length === 0) {
+    throw new Error(
+      draft.recurrenceInterval === 2
+        ? 'Choose at least one day for every 2 weeks.'
+        : 'Choose at least one weekly day.'
+    );
+  }
+
+  if (draft.recurrenceType === 'monthly' && !draft.recurrenceMonthlyMode) {
+    throw new Error('Choose how the monthly ride should repeat.');
   }
 }
 
-function buildInsertPayload(draft: RideDraft, driverId: string, existingGroupId?: string) {
+function buildInsertPayload(
+  draft: RideDraft,
+  driverId: string,
+  existingGroupId?: string,
+  options?: {
+    generationStartIso?: string;
+    excludedDates?: Set<string>;
+    recurrenceEndDate?: string | null;
+  }
+) {
   validateDraft(draft);
 
   const groupId = existingGroupId ?? createUuid();
   const payAmount = Number(draft.payAmount || '0');
-  const recurrenceDays =
-    draft.recurrenceType === 'weekday'
-      ? getDefaultWeekdays()
-      : draft.recurrenceType === 'custom'
-        ? [...draft.recurrenceDays].sort((a, b) => a - b)
-        : [];
+  const recurrenceRule = buildRecurrenceRule({
+    recurrenceType: draft.recurrenceType,
+    recurrenceInterval: draft.recurrenceInterval,
+    recurrenceDays: draft.recurrenceDays,
+    recurrenceMonthlyMode: draft.recurrenceMonthlyMode,
+    recurrenceAnchorDate: draft.serviceDate,
+    recurrenceEndDate: options?.recurrenceEndDate,
+  });
 
   const group: TablesInsert<'trip_groups'> = {
     id: groupId,
@@ -383,20 +425,32 @@ function buildInsertPayload(draft: RideDraft, driverId: string, existingGroupId?
     phone: draft.phone.trim(),
     trip_type: draft.tripType,
     pay_amount: payAmount,
-    recurrence_type: draft.recurrenceType,
-    recurrence_days: recurrenceDays,
+    recurrence_type: recurrenceRule.recurrenceType,
+    recurrence_interval: recurrenceRule.recurrenceInterval,
+    recurrence_days: recurrenceRule.recurrenceDays,
+    recurrence_monthly_mode: recurrenceRule.recurrenceMonthlyMode,
+    recurrence_anchor_date: recurrenceRule.recurrenceAnchorDate,
+    recurrence_end_date: recurrenceRule.recurrenceEndDate,
     notes: draft.notes.trim(),
   };
 
-  const startDate = fromIsoDate(draft.serviceDate);
   const dates: string[] = [];
 
-  if (draft.recurrenceType === 'none') {
+  if (recurrenceRule.recurrenceType === 'none') {
     dates.push(draft.serviceDate);
   } else {
-    dates.push(...getRecurringDatesForWindow(recurrenceDays, toIsoDate(startDate), RECURRING_LOOKAHEAD_DAYS));
+    dates.push(
+      ...getRecurringDatesForWindow(
+        recurrenceRule,
+        options?.generationStartIso ?? draft.serviceDate,
+        RECURRING_LOOKAHEAD_DAYS
+      )
+    );
   }
-  const { occurrences, legs } = buildOccurrencesAndLegsForServiceDates(draft, groupId, dates);
+  const filteredDates = options?.excludedDates
+    ? dates.filter((date) => !options.excludedDates?.has(date))
+    : dates;
+  const { occurrences, legs } = buildOccurrencesAndLegsForServiceDates(draft, groupId, filteredDates);
 
   return { group, occurrences, legs };
 }
@@ -413,7 +467,9 @@ function createDefaultDraft(): RideDraft {
     returnDropoffAddress: '',
     payAmount: '',
     recurrenceType: 'none',
+    recurrenceInterval: 1,
     recurrenceDays: [],
+    recurrenceMonthlyMode: null,
     serviceDate: todayIso(),
     notes: '',
   };
@@ -469,8 +525,13 @@ function createDraftFromGroup(state: RouteFlowState, groupId?: string): RideDraf
     returnDropoffAddress: returnEntry?.leg.dropoffAddress ?? outboundEntry.leg.pickupAddress,
     payAmount: String(group.payAmount),
     recurrenceType: group.recurrenceType,
+    recurrenceInterval: group.recurrenceInterval,
     recurrenceDays: group.recurrenceDays,
-    serviceDate: outboundEntry.occurrence.serviceDate,
+    recurrenceMonthlyMode: group.recurrenceMonthlyMode,
+    serviceDate:
+      group.recurrenceType === 'none'
+        ? outboundEntry.occurrence.serviceDate
+        : group.recurrenceAnchorDate,
     notes: group.notes,
   };
 }
@@ -526,7 +587,15 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
         }
 
         const draft = createDraftFromGroup(nextState, group.id);
-        const windowStartIso = maxIsoDate(today, draft.serviceDate);
+        const recurrenceRule = buildRecurrenceRule({
+          recurrenceType: group.recurrenceType,
+          recurrenceInterval: group.recurrenceInterval,
+          recurrenceDays: group.recurrenceDays,
+          recurrenceMonthlyMode: group.recurrenceMonthlyMode,
+          recurrenceAnchorDate: group.recurrenceAnchorDate,
+          recurrenceEndDate: group.recurrenceEndDate,
+        });
+        const windowStartIso = today;
         const windowEndIso = toIsoDate(
           addDays(fromIsoDate(windowStartIso), RECURRING_LOOKAHEAD_DAYS - 1)
         );
@@ -541,7 +610,7 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
             .map((occurrence) => occurrence.serviceDate)
         );
         const desiredDates = getRecurringDatesForWindow(
-          group.recurrenceDays,
+          recurrenceRule,
           windowStartIso,
           RECURRING_LOOKAHEAD_DAYS
         );
@@ -766,25 +835,58 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
           throw groupError;
         }
 
-        const { error: occurrencesError } = await client
-          .from('trip_occurrences')
-          .insert(payload.occurrences);
+        if (payload.occurrences.length > 0) {
+          const { error: occurrencesError } = await client
+            .from('trip_occurrences')
+            .insert(payload.occurrences);
 
-        if (occurrencesError) {
-          throw occurrencesError;
-        }
+          if (occurrencesError) {
+            throw occurrencesError;
+          }
 
-        const { error: legsError } = await client.from('trip_legs').insert(payload.legs);
+          const { error: legsError } = await client.from('trip_legs').insert(payload.legs);
 
-        if (legsError) {
-          throw legsError;
+          if (legsError) {
+            throw legsError;
+          }
         }
 
         await loadState();
       },
       updateRide: async (groupId, draft) => {
         const { client, userId } = requireSignedInClient();
-        const payload = buildInsertPayload(draft, userId, groupId);
+        const currentGroup = state.tripGroups.find((group) => group.id === groupId);
+        const isOneTimeRide = draft.recurrenceType === 'none';
+        const cutoffIso = todayIso();
+        const deletableOccurrences = state.tripOccurrences.filter((occurrence) => {
+          if (occurrence.tripGroupId !== groupId) {
+            return false;
+          }
+
+          if (isOneTimeRide) {
+            return true;
+          }
+
+          return (
+            occurrence.serviceDate > cutoffIso ||
+            (occurrence.serviceDate === cutoffIso && occurrence.status === 'scheduled')
+          );
+        });
+        const preservedDates = new Set(
+          state.tripOccurrences
+            .filter(
+              (occurrence) =>
+                occurrence.tripGroupId === groupId &&
+                !deletableOccurrences.some((candidate) => candidate.id === occurrence.id)
+            )
+            .map((occurrence) => occurrence.serviceDate)
+        );
+        const payload = buildInsertPayload(draft, userId, groupId, {
+          generationStartIso: isOneTimeRide ? draft.serviceDate : cutoffIso,
+          excludedDates: isOneTimeRide ? undefined : preservedDates,
+          recurrenceEndDate:
+            isOneTimeRide || !currentGroup?.recurrenceEndDate ? null : currentGroup.recurrenceEndDate,
+        });
         const { id: _groupId, ...groupUpdate } = payload.group;
 
         const { error: groupError } = await client
@@ -796,9 +898,7 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
           throw groupError;
         }
 
-        const existingOccurrenceIds = state.tripOccurrences
-          .filter((o) => o.tripGroupId === groupId)
-          .map((o) => o.id);
+        const existingOccurrenceIds = deletableOccurrences.map((occurrence) => occurrence.id);
 
         if (existingOccurrenceIds.length > 0) {
           const { error: deleteLegsError } = await client
@@ -811,27 +911,31 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
           }
         }
 
-        const { error: deleteOccurrencesError } = await client
-          .from('trip_occurrences')
-          .delete()
-          .eq('trip_group_id', groupId);
+        if (existingOccurrenceIds.length > 0) {
+          const { error: deleteOccurrencesError } = await client
+            .from('trip_occurrences')
+            .delete()
+            .in('id', existingOccurrenceIds);
 
-        if (deleteOccurrencesError) {
-          throw deleteOccurrencesError;
+          if (deleteOccurrencesError) {
+            throw deleteOccurrencesError;
+          }
         }
 
-        const { error: occurrencesError } = await client
-          .from('trip_occurrences')
-          .insert(payload.occurrences);
+        if (payload.occurrences.length > 0) {
+          const { error: occurrencesError } = await client
+            .from('trip_occurrences')
+            .insert(payload.occurrences);
 
-        if (occurrencesError) {
-          throw occurrencesError;
-        }
+          if (occurrencesError) {
+            throw occurrencesError;
+          }
 
-        const { error: legsError } = await client.from('trip_legs').insert(payload.legs);
+          const { error: legsError } = await client.from('trip_legs').insert(payload.legs);
 
-        if (legsError) {
-          throw legsError;
+          if (legsError) {
+            throw legsError;
+          }
         }
 
         await loadState();
@@ -845,29 +949,55 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
       cancelOccurrenceWithPay: async (occurrenceId) => {
         await setOccurrenceStatus(occurrenceId, 'canceled_paid');
       },
-      cancelSeries: async (groupId) => {
+      deleteSeriesFromOccurrence: async (occurrenceId) => {
         const { client } = requireSignedInClient();
+        const selectedOccurrence = state.tripOccurrences.find((occurrence) => occurrence.id === occurrenceId);
+
+        if (!selectedOccurrence) {
+          throw new Error('Ride not found or it was already removed.');
+        }
+
+        const group = state.tripGroups.find((item) => item.id === selectedOccurrence.tripGroupId);
+
+        if (!group || group.recurrenceType === 'none') {
+          throw new Error('Only recurring series can be deleted this way.');
+        }
+
+        const cutoffIso = selectedOccurrence.serviceDate;
+        const recurrenceEndDate = toIsoDate(addDays(fromIsoDate(cutoffIso), -1));
         const occurrenceIds = state.tripOccurrences
-          .filter((occurrence) => occurrence.tripGroupId === groupId)
+          .filter(
+            (occurrence) =>
+              occurrence.tripGroupId === group.id && occurrence.serviceDate >= cutoffIso
+          )
           .map((occurrence) => occurrence.id);
 
-        const { error: occurrencesError } = await client
-          .from('trip_occurrences')
-          .update({ status: 'canceled' })
-          .eq('trip_group_id', groupId);
+        const { error: groupError } = await client
+          .from('trip_groups')
+          .update({ recurrence_end_date: recurrenceEndDate })
+          .eq('id', group.id);
 
-        if (occurrencesError) {
-          throw occurrencesError;
+        if (groupError) {
+          throw groupError;
         }
 
         if (occurrenceIds.length > 0) {
-          const { error: legsError } = await client
+          const { error: deleteLegsError } = await client
             .from('trip_legs')
-            .update({ status: 'canceled' })
+            .delete()
             .in('trip_occurrence_id', occurrenceIds);
 
-          if (legsError) {
-            throw legsError;
+          if (deleteLegsError) {
+            throw deleteLegsError;
+          }
+
+          const { error: deleteOccurrencesError } = await client
+            .from('trip_occurrences')
+            .delete()
+            .in('id', occurrenceIds);
+
+          if (deleteOccurrencesError) {
+            throw deleteOccurrencesError;
           }
         }
 
@@ -914,20 +1044,41 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
       },
       updatePreferences: async (preferences) => {
         const { client, userId } = requireSignedInClient();
+        let warning: string | undefined;
 
         const { error } = await client.from('driver_preferences').upsert({
           driver_id: userId,
           default_navigation_app: preferences.defaultNavigationApp,
           notifications_enabled: preferences.notificationsEnabled,
           first_ride_summary_enabled: preferences.firstRideSummaryEnabled,
-          first_ride_summary_lead_time_minutes: preferences.firstRideSummaryLeadTimeMinutes,
+          first_ride_summary_time: preferences.firstRideSummaryTime,
         });
 
         if (error) {
-          throw error;
+          if (isMissingColumnError(error, 'first_ride_summary_time')) {
+            const { error: legacyError } = await client.from('driver_preferences').upsert(
+              {
+                driver_id: userId,
+                default_navigation_app: preferences.defaultNavigationApp,
+                notifications_enabled: preferences.notificationsEnabled,
+                first_ride_summary_enabled: preferences.firstRideSummaryEnabled,
+                first_ride_summary_lead_time_minutes: 60,
+              } as never
+            );
+
+            if (legacyError) {
+              throw new Error(legacyError.message ?? 'Failed to save preferences.');
+            }
+
+            warning =
+              'Your other preferences were saved, but morning summary time could not sync because the latest database migration has not been applied yet.';
+          } else {
+            throw new Error(error.message ?? 'Failed to save preferences.');
+          }
         }
 
         setState((current) => ({ ...current, preferences }));
+        return { warning };
       },
     }),
     [isHydrated, loadState, requireSignedInClient, setOccurrenceStatus, sortedViews, state]

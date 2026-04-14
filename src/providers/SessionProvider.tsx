@@ -108,7 +108,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
           default_navigation_app: 'google_maps',
           notifications_enabled: true,
           first_ride_summary_enabled: true,
-          first_ride_summary_lead_time_minutes: 60,
+          first_ride_summary_time: '06:00',
         },
         {
           onConflict: 'driver_id',

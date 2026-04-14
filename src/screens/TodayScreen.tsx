@@ -384,11 +384,11 @@ export function TodayScreen({ navigation }: Props) {
           />
         ))
       ) : (
-        <SectionCard title="No rides scheduled">
-          <Text className="text-sm leading-6 text-slate-300">
-            Start with one-time rides or build a recurring weekday route in a few taps.
-          </Text>
-        </SectionCard>
+          <SectionCard title="No rides scheduled">
+            <Text className="text-sm leading-6 text-slate-300">
+            Start with one-time rides or build a recurring route in a few taps.
+            </Text>
+          </SectionCard>
       )}
 
       <View className="mb-3 mt-2 flex-row items-center justify-between">

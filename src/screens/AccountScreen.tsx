@@ -6,27 +6,55 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { AuthFormCard } from '@/components/AuthFormCard';
+import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
 import { UserAvatar } from '@/components/UserAvatar';
 import {
   ActionButton,
   InputField,
   PillButton,
   Screen,
+  SelectField,
   SectionCard,
   ToggleRow,
 } from '@/components/ui';
+import {
+  DEFAULT_FIRST_RIDE_SUMMARY_TIME,
+  formatTime,
+  getTimeDate,
+  isMorningSummaryTime,
+  todayIso,
+  toTimeValue,
+} from '@/lib/date';
 import { requestNotificationPermissions } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/SessionProvider';
 import { useToast } from '@/providers/ToastProvider';
 import { useRouteFlow } from '@/providers/RouteFlowProvider';
 import { RootStackParamList } from '@/types/navigation';
-import { FirstRideSummaryLeadTime, NavigationApp } from '@/types/ride';
+import { NavigationApp } from '@/types/ride';
 
 const navApps: NavigationApp[] = ['waze', 'google_maps', 'apple_maps'];
-const firstRideSummaryLeadTimes: FirstRideSummaryLeadTime[] = [15, 30, 60];
 const appVersion = (Constants.expoConfig?.version ?? '1.0.0') as string;
 const avatarBuckets = ['diver_avatar', 'driver_avatar'] as const;
+const MORNING_SUMMARY_MIN_TIME = '00:00';
+const MORNING_SUMMARY_MAX_TIME = '11:00';
+const MORNING_SUMMARY_TIME_CONFIG = {
+  minuteInterval: 1,
+  minimumTime: MORNING_SUMMARY_MIN_TIME,
+  maximumTime: MORNING_SUMMARY_MAX_TIME,
+} as const;
+
+function getErrorMessage(error: unknown, fallback = 'Try again.') {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    return String((error as { message: unknown }).message);
+  }
+
+  return fallback;
+}
 
 function navLabel(app: NavigationApp) {
   switch (app) {
@@ -72,12 +100,9 @@ function getAvatarContentType(asset: ImagePicker.ImagePickerAsset, extension: st
   return 'image/jpeg';
 }
 
-function getFirstRideSummaryLeadTimeLabel(minutes: FirstRideSummaryLeadTime) {
-  if (minutes === 60) {
-    return '1 hour before';
-  }
-
-  return `${minutes} min before`;
+function getMorningSummaryTimeValue(time: string) {
+  const safeTime = isMorningSummaryTime(time) ? time : DEFAULT_FIRST_RIDE_SUMMARY_TIME;
+  return getTimeDate(todayIso(), safeTime);
 }
 
 export function AccountScreen() {
@@ -90,6 +115,7 @@ export function AccountScreen() {
   const [pendingAvatarAsset, setPendingAvatarAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
+  const [isMorningSummaryPickerVisible, setIsMorningSummaryPickerVisible] = useState(false);
 
   useEffect(() => {
     setProfileDraft(state.profile);
@@ -215,6 +241,17 @@ export function AccountScreen() {
       setIsSavingPreferences(true);
 
       if (
+        preferencesDraft.firstRideSummaryEnabled &&
+        !isMorningSummaryTime(preferencesDraft.firstRideSummaryTime)
+      ) {
+        Alert.alert(
+          'Choose a morning time',
+          'Set the morning summary between 12:00 AM and 11:00 AM.'
+        );
+        return;
+      }
+
+      if (
         Platform.OS !== 'web' &&
         preferencesDraft.notificationsEnabled &&
         preferencesDraft.firstRideSummaryEnabled
@@ -230,16 +267,35 @@ export function AccountScreen() {
         }
       }
 
-      await updatePreferences(preferencesDraft);
+      const result = await updatePreferences(preferencesDraft);
       showToast({ title: 'Preferences saved', message: 'RouteFlow updated your default settings.' });
+
+      if (result.warning) {
+        Alert.alert('Preferences saved with a warning', result.warning);
+      }
     } catch (error) {
-      Alert.alert(
-        'Preferences save failed',
-        error instanceof Error ? error.message : 'Try again.'
-      );
+      Alert.alert('Preferences save failed', getErrorMessage(error));
     } finally {
       setIsSavingPreferences(false);
     }
+  };
+
+  const handleMorningSummaryTimeConfirm = (value: Date) => {
+    const nextTime = toTimeValue(value);
+
+    if (!isMorningSummaryTime(nextTime)) {
+      Alert.alert(
+        'Choose a morning time',
+        'Set the morning summary between 12:00 AM and 11:00 AM.'
+      );
+      return;
+    }
+
+    setPreferencesDraft((current) => ({
+      ...current,
+      firstRideSummaryTime: nextTime,
+    }));
+    setIsMorningSummaryPickerVisible(false);
   };
 
   return (
@@ -335,9 +391,9 @@ export function AccountScreen() {
             {preferencesDraft.notificationsEnabled ? (
               <View className="mt-4 gap-4 rounded-[28px] border border-white/10 bg-white/5 px-4 py-4">
                 <View>
-                  <Text className="text-sm font-semibold text-white">First ride summary</Text>
+                  <Text className="text-sm font-semibold text-white">Morning summary</Text>
                   <Text className="mt-1 text-sm leading-6 text-slate-400">
-                    Send one morning reminder before the first scheduled pickup of the day.
+                    Send one summary at a set morning time to view your ride schedule.
                   </Text>
                 </View>
                 <ToggleRow
@@ -352,22 +408,15 @@ export function AccountScreen() {
                 />
                 {preferencesDraft.firstRideSummaryEnabled ? (
                   <View>
-                    <Text className="mb-2 text-sm font-medium text-slate-300">Send it</Text>
-                    <View className="flex-row flex-wrap gap-2">
-                      {firstRideSummaryLeadTimes.map((minutes) => (
-                        <PillButton
-                          key={minutes}
-                          label={getFirstRideSummaryLeadTimeLabel(minutes)}
-                          selected={preferencesDraft.firstRideSummaryLeadTimeMinutes === minutes}
-                          onPress={() =>
-                            setPreferencesDraft((current) => ({
-                              ...current,
-                              firstRideSummaryLeadTimeMinutes: minutes,
-                            }))
-                          }
-                        />
-                      ))}
-                    </View>
+                    <SelectField
+                      label="Send time"
+                      value={formatTime(preferencesDraft.firstRideSummaryTime)}
+                      icon="time-outline"
+                      onPress={() => setIsMorningSummaryPickerVisible(true)}
+                    />
+                    <Text className="text-sm leading-6 text-slate-400">
+                      Choose any time from 12:00 AM through 11:00 AM.
+                    </Text>
                   </View>
                 ) : null}
               </View>
@@ -418,6 +467,16 @@ export function AccountScreen() {
           Version {appVersion}
         </Text>
       </View>
+
+      <DateTimePickerSheet
+        visible={isMorningSummaryPickerVisible}
+        mode="time"
+        title="Select morning summary time"
+        value={getMorningSummaryTimeValue(preferencesDraft.firstRideSummaryTime)}
+        timeConfig={MORNING_SUMMARY_TIME_CONFIG}
+        onCancel={() => setIsMorningSummaryPickerVisible(false)}
+        onConfirm={handleMorningSummaryTimeConfirm}
+      />
     </Screen>
   );
 }

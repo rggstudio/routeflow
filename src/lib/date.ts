@@ -20,6 +20,8 @@ const fullMonthDayYearFormatter = new Intl.DateTimeFormat('en-US', {
   day: 'numeric',
   year: 'numeric',
 });
+export const DEFAULT_FIRST_RIDE_SUMMARY_TIME = '06:00';
+const MORNING_SUMMARY_MAX_MINUTES = 11 * 60;
 
 export function todayIso() {
   return toIsoDate(new Date());
@@ -68,6 +70,41 @@ export function getFullDateLabel(isoDate: string) {
 
 export function combineDateAndTime(isoDate: string, time: string) {
   return new Date(`${isoDate}T${time}:00`);
+}
+
+export function toTimeValue(date: Date) {
+  const hours = `${date.getHours()}`.padStart(2, '0');
+  const minutes = `${date.getMinutes()}`.padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+export function getTimeDate(baseDateIso: string, time: string) {
+  const [hours, minutes] = time.split(':').map(Number);
+  const date = fromIsoDate(baseDateIso);
+  date.setHours(hours, minutes, 0, 0);
+  return date;
+}
+
+export function timeToMinutes(time: string) {
+  const match = /^(\d{2}):(\d{2})$/.exec(time);
+
+  if (!match) {
+    return null;
+  }
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+
+  if (hours > 23 || minutes > 59) {
+    return null;
+  }
+
+  return hours * 60 + minutes;
+}
+
+export function isMorningSummaryTime(time: string) {
+  const minutes = timeToMinutes(time);
+  return minutes !== null && minutes >= 0 && minutes <= MORNING_SUMMARY_MAX_MINUTES;
 }
 
 export function formatTime(time: string) {

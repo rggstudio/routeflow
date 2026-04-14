@@ -3,6 +3,7 @@ import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { BottomSheetScreen } from '@/components/BottomSheetScreen';
 import { PillButton } from '@/components/ui';
+import { timeToMinutes } from '@/lib/date';
 
 type PickerMode = 'date' | 'time';
 
@@ -11,6 +12,11 @@ type DateTimePickerSheetProps = {
   mode: PickerMode;
   title: string;
   value: Date;
+  timeConfig?: {
+    minuteInterval?: number;
+    minimumTime?: string;
+    maximumTime?: string;
+  };
   onCancel: () => void;
   onConfirm: (value: Date) => void;
 };
@@ -21,7 +27,6 @@ const monthFormatter = new Intl.DateTimeFormat('en-US', {
 });
 
 const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const minuteOptions = Array.from({ length: 12 }, (_, index) => `${index * 5}`.padStart(2, '0'));
 const hourOptions = Array.from({ length: 12 }, (_, index) => `${index + 1}`);
 
 function startOfMonth(date: Date) {
@@ -74,11 +79,57 @@ function applyTimeParts(baseDate: Date, hour: string, minutes: string, meridiem:
   return next;
 }
 
+function get12HourPartsFromMinutes(totalMinutes: number) {
+  const hours24 = Math.floor(totalMinutes / 60);
+  const minutes = `${totalMinutes % 60}`.padStart(2, '0');
+  const meridiem = hours24 >= 12 ? 'PM' : 'AM';
+  const hour = `${hours24 % 12 || 12}`;
+
+  return {
+    hour,
+    minutes,
+    meridiem: meridiem as 'AM' | 'PM',
+  };
+}
+
+function buildAllowedTimes(timeConfig?: DateTimePickerSheetProps['timeConfig']) {
+  const minuteInterval = Math.max(1, timeConfig?.minuteInterval ?? 5);
+  const minimumMinutes = timeConfig?.minimumTime ? timeToMinutes(timeConfig.minimumTime) : 0;
+  const maximumMinutes = timeConfig?.maximumTime ? timeToMinutes(timeConfig.maximumTime) : 23 * 60 + 59;
+
+  if (minimumMinutes === null || maximumMinutes === null || minimumMinutes > maximumMinutes) {
+    return [];
+  }
+
+  const times: number[] = [];
+
+  for (let value = minimumMinutes; value <= maximumMinutes; value += minuteInterval) {
+    times.push(value);
+  }
+
+  if (times[times.length - 1] !== maximumMinutes) {
+    times.push(maximumMinutes);
+  }
+
+  return times;
+}
+
+function getClosestAllowedTime(value: Date, allowedTimes: number[]) {
+  const selectedMinutes = value.getHours() * 60 + value.getMinutes();
+
+  return (
+    allowedTimes.find((candidate) => candidate >= selectedMinutes) ??
+    allowedTimes[allowedTimes.length - 1] ??
+    selectedMinutes
+  );
+}
+
 export function DateTimePickerSheet({
   visible,
   mode,
   title,
   value,
+  timeConfig,
   onCancel,
   onConfirm,
 }: DateTimePickerSheetProps) {
@@ -87,6 +138,38 @@ export function DateTimePickerSheet({
   const [timeHour, setTimeHour] = useState(get12HourParts(value).hour);
   const [timeMinutes, setTimeMinutes] = useState(get12HourParts(value).minutes);
   const [timeMeridiem, setTimeMeridiem] = useState<'AM' | 'PM'>(get12HourParts(value).meridiem as 'AM' | 'PM');
+  const allowedTimes = useMemo(() => buildAllowedTimes(timeConfig), [timeConfig]);
+  const meridiemOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(allowedTimes.map((minutes) => get12HourPartsFromMinutes(minutes).meridiem))
+      ) as ('AM' | 'PM')[],
+    [allowedTimes]
+  );
+  const filteredHourOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          allowedTimes
+            .map((minutes) => get12HourPartsFromMinutes(minutes))
+            .filter((parts) => parts.meridiem === timeMeridiem)
+            .map((parts) => parts.hour)
+        )
+      ),
+    [allowedTimes, timeMeridiem]
+  );
+  const filteredMinuteOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          allowedTimes
+            .map((minutes) => get12HourPartsFromMinutes(minutes))
+            .filter((parts) => parts.meridiem === timeMeridiem && parts.hour === timeHour)
+            .map((parts) => parts.minutes)
+        )
+      ),
+    [allowedTimes, timeHour, timeMeridiem]
+  );
 
   useEffect(() => {
     if (!visible) {
@@ -96,11 +179,44 @@ export function DateTimePickerSheet({
     setDraftDate(value);
     setVisibleMonth(startOfMonth(value));
 
-    const parts = get12HourParts(value);
+    const parts =
+      mode === 'time' && allowedTimes.length > 0
+        ? get12HourPartsFromMinutes(getClosestAllowedTime(value, allowedTimes))
+        : get12HourParts(value);
     setTimeHour(parts.hour);
     setTimeMinutes(parts.minutes);
     setTimeMeridiem(parts.meridiem as 'AM' | 'PM');
-  }, [value, visible]);
+  }, [allowedTimes, mode, value, visible]);
+
+  useEffect(() => {
+    if (!visible || mode !== 'time') {
+      return;
+    }
+
+    if (!meridiemOptions.includes(timeMeridiem) && meridiemOptions[0]) {
+      setTimeMeridiem(meridiemOptions[0]);
+    }
+  }, [meridiemOptions, mode, timeMeridiem, visible]);
+
+  useEffect(() => {
+    if (!visible || mode !== 'time') {
+      return;
+    }
+
+    if (!filteredHourOptions.includes(timeHour) && filteredHourOptions[0]) {
+      setTimeHour(filteredHourOptions[0]);
+    }
+  }, [filteredHourOptions, mode, timeHour, visible]);
+
+  useEffect(() => {
+    if (!visible || mode !== 'time') {
+      return;
+    }
+
+    if (!filteredMinuteOptions.includes(timeMinutes) && filteredMinuteOptions[0]) {
+      setTimeMinutes(filteredMinuteOptions[0]);
+    }
+  }, [filteredMinuteOptions, mode, timeMinutes, visible]);
 
   const calendarDays = useMemo(() => buildCalendarDays(visibleMonth), [visibleMonth]);
 
@@ -208,7 +324,7 @@ export function DateTimePickerSheet({
                 <View>
                   <Text className="mb-3 text-sm font-medium text-slate-300">Hour</Text>
                   <View className="flex-row flex-wrap gap-2">
-                    {hourOptions.map((hour) => (
+                    {(filteredHourOptions.length > 0 ? filteredHourOptions : hourOptions).map((hour) => (
                       <PillButton
                         key={hour}
                         label={hour}
@@ -222,7 +338,7 @@ export function DateTimePickerSheet({
                 <View>
                   <Text className="mb-3 text-sm font-medium text-slate-300">Minutes</Text>
                   <View className="flex-row flex-wrap gap-2">
-                    {minuteOptions.map((minutes) => (
+                    {filteredMinuteOptions.map((minutes) => (
                       <PillButton
                         key={minutes}
                         label={minutes}
@@ -236,7 +352,7 @@ export function DateTimePickerSheet({
                 <View>
                   <Text className="mb-3 text-sm font-medium text-slate-300">AM / PM</Text>
                   <View className="flex-row flex-wrap gap-2">
-                    {(['AM', 'PM'] as const).map((valueLabel) => (
+                    {meridiemOptions.map((valueLabel) => (
                       <PillButton
                         key={valueLabel}
                         label={valueLabel}

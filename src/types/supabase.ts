@@ -18,7 +18,7 @@ export type Database = {
           default_navigation_app: string;
           driver_id: string;
           first_ride_summary_enabled: boolean;
-          first_ride_summary_lead_time_minutes: number;
+          first_ride_summary_time: string;
           notifications_enabled: boolean;
           updated_at: string;
         };
@@ -27,7 +27,7 @@ export type Database = {
           default_navigation_app?: string;
           driver_id: string;
           first_ride_summary_enabled?: boolean;
-          first_ride_summary_lead_time_minutes?: number;
+          first_ride_summary_time?: string;
           notifications_enabled?: boolean;
           updated_at?: string;
         };
@@ -36,7 +36,7 @@ export type Database = {
           default_navigation_app?: string;
           driver_id?: string;
           first_ride_summary_enabled?: boolean;
-          first_ride_summary_lead_time_minutes?: number;
+          first_ride_summary_time?: string;
           notifications_enabled?: boolean;
           updated_at?: string;
         };
@@ -169,7 +169,11 @@ export type Database = {
           notes: string;
           pay_amount: number;
           phone: string | null;
+          recurrence_anchor_date: string;
           recurrence_days: number[];
+          recurrence_end_date: string | null;
+          recurrence_interval: number;
+          recurrence_monthly_mode: string | null;
           recurrence_type: string;
           rider_name: string;
           trip_type: string;
@@ -182,7 +186,11 @@ export type Database = {
           notes?: string;
           pay_amount?: number;
           phone?: string | null;
+          recurrence_anchor_date?: string;
           recurrence_days?: number[];
+          recurrence_end_date?: string | null;
+          recurrence_interval?: number;
+          recurrence_monthly_mode?: string | null;
           recurrence_type?: string;
           rider_name: string;
           trip_type: string;
@@ -195,7 +203,11 @@ export type Database = {
           notes?: string;
           pay_amount?: number;
           phone?: string | null;
+          recurrence_anchor_date?: string;
           recurrence_days?: number[];
+          recurrence_end_date?: string | null;
+          recurrence_interval?: number;
+          recurrence_monthly_mode?: string | null;
           recurrence_type?: string;
           rider_name?: string;
           trip_type?: string;

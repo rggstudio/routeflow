@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, ScrollView, Text, View } from 'react-native';
+import { Alert, Keyboard, Platform, ScrollView, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { AddressAutocomplete } from '@/components/AddressAutocomplete';
@@ -8,10 +8,11 @@ import { BottomSheetScreen } from '@/components/BottomSheetScreen';
 import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
 import { ActionButton, InputField, PillButton, SectionCard, SelectField } from '@/components/ui';
 import { formatTime, fromIsoDate, getLongDateLabel, todayIso, toIsoDate, weekdayIndexToLabel } from '@/lib/date';
+import { buildRecurrenceSummary, getDefaultRecurrenceDays, normalizeRecurrenceDays } from '@/lib/recurrence';
 import { useRouteFlow } from '@/providers/RouteFlowProvider';
 import { useToast } from '@/providers/ToastProvider';
 import { RootStackParamList } from '@/types/navigation';
-import { RecurrenceType, RideDraft, TripType } from '@/types/ride';
+import { MonthlyRecurrenceMode, RideDraft, TripType } from '@/types/ride';
 
 function makeSessionToken() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -22,10 +23,18 @@ function makeSessionToken() {
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RideForm'>;
 
-const recurrenceModes: { value: RecurrenceType; label: string }[] = [
+type RecurrenceSelection = 'none' | 'weekly' | 'biweekly' | 'monthly';
+
+const recurrenceModes: { value: RecurrenceSelection; label: string }[] = [
   { value: 'none', label: 'One-time' },
-  { value: 'weekday', label: 'Every weekday' },
-  { value: 'custom', label: 'Custom days' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'biweekly', label: 'Every 2 weeks' },
+  { value: 'monthly', label: 'Monthly' },
+];
+
+const monthlyModes: { value: MonthlyRecurrenceMode; label: string }[] = [
+  { value: 'day_of_month', label: 'Same date' },
+  { value: 'nth_weekday', label: 'Same weekday pattern' },
 ];
 
 const tripTypes: { value: TripType; label: string }[] = [
@@ -75,7 +84,9 @@ export function RideFormScreen({ navigation, route }: Props) {
       returnDropoffAddress: '',
       payAmount: '',
       recurrenceType: 'none',
+      recurrenceInterval: 1,
       recurrenceDays: [],
+      recurrenceMonthlyMode: null,
       serviceDate: todayIso(),
       notes: '',
     }
@@ -84,6 +95,70 @@ export function RideFormScreen({ navigation, route }: Props) {
   const setField = <K extends keyof RideDraft>(key: K, value: RideDraft[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
   };
+
+  const recurrenceSelection: RecurrenceSelection =
+    draft.recurrenceType === 'none'
+      ? 'none'
+      : draft.recurrenceType === 'monthly'
+        ? 'monthly'
+        : draft.recurrenceInterval === 2
+          ? 'biweekly'
+          : 'weekly';
+
+  const applyRecurrenceSelection = (selection: RecurrenceSelection) => {
+    if (selection === 'none') {
+      setDraft((current) => ({
+        ...current,
+        recurrenceType: 'none',
+        recurrenceInterval: 1,
+        recurrenceDays: [],
+        recurrenceMonthlyMode: null,
+      }));
+      return;
+    }
+
+    if (selection === 'monthly') {
+      setDraft((current) => ({
+        ...current,
+        recurrenceType: 'monthly',
+        recurrenceInterval: 1,
+        recurrenceDays: [],
+        recurrenceMonthlyMode: current.recurrenceMonthlyMode ?? 'day_of_month',
+      }));
+      return;
+    }
+
+    setDraft((current) => ({
+      ...current,
+      recurrenceType: 'weekly',
+      recurrenceInterval: selection === 'biweekly' ? 2 : 1,
+      recurrenceDays:
+        normalizeRecurrenceDays(current.recurrenceDays).length > 0
+          ? normalizeRecurrenceDays(current.recurrenceDays)
+          : getDefaultRecurrenceDays(current.serviceDate),
+      recurrenceMonthlyMode: null,
+    }));
+  };
+
+  const toggleRecurrenceDay = (day: number) => {
+    const selected = draft.recurrenceDays.includes(day);
+    const nextDays = selected
+      ? draft.recurrenceDays.filter((value) => value !== day)
+      : [...draft.recurrenceDays, day];
+
+    setField('recurrenceDays', normalizeRecurrenceDays(nextDays));
+  };
+
+  const recurrenceSummary =
+    recurrenceSelection === 'none'
+      ? ''
+      : buildRecurrenceSummary({
+          recurrenceType: draft.recurrenceType,
+          recurrenceInterval: draft.recurrenceInterval,
+          recurrenceDays: draft.recurrenceDays,
+          recurrenceMonthlyMode: draft.recurrenceMonthlyMode,
+          recurrenceAnchorDate: draft.serviceDate,
+        });
 
   const getPickerConfig = (field: PickerField) => {
     switch (field) {
@@ -181,7 +256,13 @@ export function RideFormScreen({ navigation, route }: Props) {
 
   return (
     <BottomSheetScreen onClose={() => navigation.goBack()}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="always">
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 140 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        onScrollBeginDrag={Keyboard.dismiss}
+      >
         <View className="mb-6">
           <Text className="text-[11px] font-semibold uppercase tracking-[2px] text-cyan-300">
             {isEditing ? 'Edit ride' : 'Add ride'}
@@ -228,33 +309,61 @@ export function RideFormScreen({ navigation, route }: Props) {
               <PillButton
                 key={mode.value}
                 label={mode.label}
-                selected={draft.recurrenceType === mode.value}
-                onPress={() => setField('recurrenceType', mode.value)}
+                selected={recurrenceSelection === mode.value}
+                onPress={() => applyRecurrenceSelection(mode.value)}
               />
             ))}
           </View>
 
-          {draft.recurrenceType === 'custom' ? (
-            <View className="flex-row flex-wrap gap-2">
-              {Array.from({ length: 7 }, (_, index) => index + 1).map((day) => {
-                const selected = draft.recurrenceDays.includes(day);
-                return (
+          {recurrenceSelection === 'weekly' ? (
+            <View className="mb-4">
+              <Text className="mb-2 text-sm font-medium text-slate-300">Shortcut</Text>
+              <View className="flex-row flex-wrap gap-2">
+                <PillButton
+                  label="Weekdays"
+                  selected={normalizeRecurrenceDays(draft.recurrenceDays).join(',') === '1,2,3,4,5'}
+                  onPress={() => setField('recurrenceDays', [1, 2, 3, 4, 5])}
+                />
+              </View>
+            </View>
+          ) : null}
+
+          {recurrenceSelection === 'weekly' || recurrenceSelection === 'biweekly' ? (
+            <View className="mb-4">
+              <Text className="mb-2 text-sm font-medium text-slate-300">Repeat on</Text>
+              <View className="flex-row flex-wrap gap-2">
+                {Array.from({ length: 7 }, (_, index) => index + 1).map((day) => (
                   <PillButton
                     key={day}
                     label={weekdayIndexToLabel(day)}
-                    selected={selected}
-                    onPress={() =>
-                      setField(
-                        'recurrenceDays',
-                        selected
-                          ? draft.recurrenceDays.filter((value) => value !== day)
-                          : [...draft.recurrenceDays, day]
-                      )
-                    }
+                    selected={draft.recurrenceDays.includes(day)}
+                    onPress={() => toggleRecurrenceDay(day)}
                   />
-                );
-              })}
+                ))}
+              </View>
             </View>
+          ) : null}
+
+          {recurrenceSelection === 'monthly' ? (
+            <View className="mb-4">
+              <Text className="mb-2 text-sm font-medium text-slate-300">Monthly pattern</Text>
+              <View className="flex-row flex-wrap gap-2">
+                {monthlyModes.map((mode) => (
+                  <PillButton
+                    key={mode.value}
+                    label={mode.label}
+                    selected={draft.recurrenceMonthlyMode === mode.value}
+                    onPress={() => setField('recurrenceMonthlyMode', mode.value)}
+                  />
+                ))}
+              </View>
+            </View>
+          ) : null}
+
+          {recurrenceSummary ? (
+            <Text className="text-sm leading-6 text-slate-300">
+              {recurrenceSummary} Service date sets the anchor.
+            </Text>
           ) : null}
         </SectionCard>
 

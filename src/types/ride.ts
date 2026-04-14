@@ -1,5 +1,6 @@
 export type TripType = 'single' | 'round_trip';
-export type RecurrenceType = 'none' | 'weekday' | 'custom';
+export type RecurrenceType = 'none' | 'weekly' | 'monthly';
+export type MonthlyRecurrenceMode = 'day_of_month' | 'nth_weekday';
 export type RideStatus =
   | 'scheduled'
   | 'in_progress'
@@ -8,7 +9,6 @@ export type RideStatus =
   | 'canceled_paid';
 export type LegType = 'outbound' | 'return';
 export type NavigationApp = 'waze' | 'google_maps' | 'apple_maps';
-export type FirstRideSummaryLeadTime = 15 | 30 | 60;
 
 export type TripGroup = {
   id: string;
@@ -18,7 +18,11 @@ export type TripGroup = {
   tripType: TripType;
   payAmount: number;
   recurrenceType: RecurrenceType;
+  recurrenceInterval: number;
   recurrenceDays: number[];
+  recurrenceMonthlyMode: MonthlyRecurrenceMode | null;
+  recurrenceAnchorDate: string;
+  recurrenceEndDate: string | null;
   notes: string;
   createdAt: string;
 };
@@ -54,7 +58,7 @@ export type DriverPreferences = {
   defaultNavigationApp: NavigationApp;
   notificationsEnabled: boolean;
   firstRideSummaryEnabled: boolean;
-  firstRideSummaryLeadTimeMinutes: FirstRideSummaryLeadTime;
+  firstRideSummaryTime: string;
 };
 
 export type RideDraft = {
@@ -68,7 +72,9 @@ export type RideDraft = {
   returnDropoffAddress: string;
   payAmount: string;
   recurrenceType: RecurrenceType;
+  recurrenceInterval: number;
   recurrenceDays: number[];
+  recurrenceMonthlyMode: MonthlyRecurrenceMode | null;
   serviceDate: string;
   notes: string;
 };

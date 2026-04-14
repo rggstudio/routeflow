@@ -33,7 +33,7 @@ export function RideDetailScreen({ navigation, route }: Props) {
     updateOccurrenceStatus,
     cancelOccurrence,
     cancelOccurrenceWithPay,
-    cancelSeries,
+    deleteSeriesFromOccurrence,
   } = useRouteFlow();
 
   const { showToast } = useToast();
@@ -77,6 +77,7 @@ export function RideDetailScreen({ navigation, route }: Props) {
       : 'Single trip';
   const pairedLabel =
     view.pairedLeg?.legType === 'return' ? 'Paired return' : 'Paired outbound';
+  const isRecurringSeries = view.group.recurrenceType !== 'none';
 
   return (
     <BottomSheetScreen onClose={() => navigation.goBack()}>
@@ -203,21 +204,21 @@ export function RideDetailScreen({ navigation, route }: Props) {
             </View>
           </SectionCard>
 
-          <SectionCard title="Manage ride">
+          <SectionCard title="Manage Ride">
             <View className="gap-3">
               <ActionButton
-                label="Edit ride"
+                label="Edit Ride"
                 icon="create-outline"
                 onPress={() => navigation.navigate('RideForm', { groupId: view.group.id })}
               />
               <ActionButton
-                label="Cancel this occurrence"
+                label="Cancel Ride"
                 kind="danger"
                 onPress={() =>
-                  Alert.alert('Cancel occurrence', 'This ride will be marked canceled.', [
+                  Alert.alert('Cancel Ride', 'This ride will be marked canceled.', [
                     { text: 'Keep it', style: 'cancel' },
                     {
-                      text: 'Cancel ride',
+                      text: 'Cancel Ride',
                       style: 'destructive',
                       onPress: () =>
                         void runRideAction(
@@ -232,11 +233,11 @@ export function RideDetailScreen({ navigation, route }: Props) {
                 }
               />
               <ActionButton
-                label="Cancel ride with pay"
+                label="Cancel Ride with Pay"
                 kind="danger"
                 onPress={() =>
                   Alert.alert(
-                    'Cancel ride with pay',
+                    'Cancel Ride with Pay',
                     'This ride will be marked canceled, but the payment will still count.',
                     [
                       { text: 'Keep it', style: 'cancel' },
@@ -256,27 +257,33 @@ export function RideDetailScreen({ navigation, route }: Props) {
                   )
                 }
               />
-              <ActionButton
-                label="Cancel entire series"
-                kind="danger"
-                onPress={() =>
-                  Alert.alert('Cancel series', 'Every occurrence in this series will be canceled.', [
-                    { text: 'Keep it', style: 'cancel' },
-                    {
-                      text: 'Cancel series',
-                      style: 'destructive',
-                      onPress: () =>
-                        void runRideAction(
-                          () => cancelSeries(view.group.id),
-                          'Series canceled',
-                          'Cancel series failed',
-                          `All scheduled rides for ${view.group.riderName} were canceled.`,
-                          () => navigation.goBack()
-                        ),
-                    },
-                  ])
-                }
-              />
+              {isRecurringSeries ? (
+                <ActionButton
+                  label="Delete Entire Series"
+                  kind="danger"
+                  onPress={() =>
+                    Alert.alert(
+                      'Delete Entire Series',
+                      'This ride and all future rides in this series will be removed from the schedule. Earlier ride history will stay intact.',
+                      [
+                        { text: 'Keep it', style: 'cancel' },
+                        {
+                          text: 'Delete Series',
+                          style: 'destructive',
+                          onPress: () =>
+                            void runRideAction(
+                              () => deleteSeriesFromOccurrence(view.occurrence.id),
+                              'Series deleted',
+                              'Delete series failed',
+                              `${view.group.riderName}'s selected ride and future rides were removed.`,
+                              () => navigation.goBack()
+                            ),
+                        },
+                      ]
+                    )
+                  }
+                />
+              ) : null}
             </View>
           </SectionCard>
         </ScrollView>
