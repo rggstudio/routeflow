@@ -15,6 +15,7 @@ type Suggestion = {
   mapbox_id: string;
   name: string;
   place_formatted: string;
+  full_address?: string;
 };
 
 type Props = {
@@ -28,14 +29,26 @@ type Props = {
 const MAPBOX_TOKEN: string = env.mapboxKey;
 const SUGGEST_URL = 'https://api.mapbox.com/search/searchbox/v1/suggest';
 const RETRIEVE_URL = 'https://api.mapbox.com/search/searchbox/v1/retrieve';
+const FORWARD_URL = 'https://api.mapbox.com/search/searchbox/v1/forward';
+
+function formatSuggestionValue(suggestion: Suggestion) {
+  return (
+    suggestion.full_address ||
+    (suggestion.place_formatted
+      ? `${suggestion.name}, ${suggestion.place_formatted}`
+      : suggestion.name)
+  );
+}
 
 export function AddressAutocomplete({ label, value, onChangeText, placeholder, sessionToken }: Props) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   // isFocused drives only the border colour — NOT the dropdown visibility.
   const [isFocused, setIsFocused] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastQueryRef = useRef('');
   const suppressFetchRef = useRef(false);
   // Tracks when the user's finger is down on a suggestion row so the blur
@@ -45,12 +58,14 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
   const fetchSuggestions = useCallback(async (query: string) => {
     if (!MAPBOX_TOKEN || query.length < 3) {
       setSuggestions([]);
+      setErrorMessage('');
       return;
     }
 
     setIsLoading(true);
     try {
-      const params = new URLSearchParams({
+      setErrorMessage('');
+      const suggestParams = new URLSearchParams({
         q: query,
         access_token: MAPBOX_TOKEN,
         session_token: sessionToken,
@@ -60,14 +75,75 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
         country: 'us',
       });
 
-      const response = await fetch(`${SUGGEST_URL}?${params}`);
-      if (!response.ok) throw new Error('Mapbox suggest failed');
+      const response = await fetch(`${SUGGEST_URL}?${suggestParams}`);
+      if (!response.ok) {
+        const responseText = await response.text();
+        throw new Error(responseText || 'Mapbox suggest failed');
+      }
 
       const data = await response.json();
+      const normalizedSuggestions: Suggestion[] = (data.suggestions ?? []).map((item: Suggestion) => ({
+        ...item,
+        full_address: item.full_address,
+      }));
+      const results = normalizedSuggestions.length > 0
+        ? normalizedSuggestions
+        : await (async () => {
+          const forwardParams = new URLSearchParams({
+            q: query,
+            access_token: MAPBOX_TOKEN,
+            types: 'address,street',
+            limit: '6',
+            language: 'en',
+            country: 'us',
+            auto_complete: 'true',
+          });
+          const forwardResponse = await fetch(`${FORWARD_URL}?${forwardParams}`);
+          if (!forwardResponse.ok) {
+            const responseText = await forwardResponse.text();
+            if (
+              forwardResponse.status === 401 ||
+              forwardResponse.status === 403 ||
+              /invalid token/i.test(responseText)
+            ) {
+              setErrorMessage('Address search is unavailable. Check the Mapbox token.');
+            }
+            return [];
+          }
+
+          const forwardData = await forwardResponse.json();
+          return (forwardData.features ?? []).map((feature: {
+            properties?: {
+              mapbox_id?: string;
+              address?: string;
+              name?: string;
+              name_preferred?: string;
+              place_formatted?: string;
+              full_address?: string;
+            };
+          }) => ({
+            mapbox_id: feature.properties?.mapbox_id ?? '',
+            name:
+              feature.properties?.address ??
+              feature.properties?.name_preferred ??
+              feature.properties?.name ??
+              '',
+            place_formatted: feature.properties?.place_formatted ?? '',
+            full_address: feature.properties?.full_address,
+          }))
+            .filter((item: Suggestion) => Boolean(item.mapbox_id) && Boolean(item.name));
+        })();
+
       if (lastQueryRef.current === query) {
-        setSuggestions(data.suggestions ?? []);
+        setSuggestions(results);
       }
-    } catch {
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        /invalid token|not authorized/i.test(error.message)
+      ) {
+        setErrorMessage('Address search is unavailable. Check the Mapbox token.');
+      }
       setSuggestions([]);
     } finally {
       setIsLoading(false);
@@ -78,6 +154,7 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
     onChangeText(text);
     lastQueryRef.current = text;
     suppressFetchRef.current = false;
+    setErrorMessage('');
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -96,13 +173,12 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
   const handleSelect = useCallback(async (suggestion: Suggestion) => {
     // Suppress any in-flight debounce and clear the dropdown immediately.
     suppressFetchRef.current = true;
+    if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
     setSuggestions([]);
+    onChangeText(formatSuggestionValue(suggestion));
     Keyboard.dismiss();
 
     if (!MAPBOX_TOKEN) {
-      onChangeText(suggestion.place_formatted
-        ? `${suggestion.name}, ${suggestion.place_formatted}`
-        : suggestion.name);
       return;
     }
 
@@ -114,7 +190,10 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
         session_token: sessionToken,
       });
       const response = await fetch(`${RETRIEVE_URL}/${suggestion.mapbox_id}?${params}`);
-      if (!response.ok) throw new Error('Mapbox retrieve failed');
+      if (!response.ok) {
+        const responseText = await response.text();
+        throw new Error(responseText || 'Mapbox retrieve failed');
+      }
 
       const data = await response.json();
       const feature = data.features?.[0];
@@ -122,14 +201,15 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
         feature?.properties?.full_address ??
         feature?.properties?.name_preferred ??
         feature?.properties?.name ??
-        (suggestion.place_formatted
-          ? `${suggestion.name}, ${suggestion.place_formatted}`
-          : suggestion.name);
+        formatSuggestionValue(suggestion);
       onChangeText(full);
-    } catch {
-      onChangeText(suggestion.place_formatted
-        ? `${suggestion.name}, ${suggestion.place_formatted}`
-        : suggestion.name);
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        /invalid token|not authorized/i.test(error.message)
+      ) {
+        setErrorMessage('Address search is unavailable. Check the Mapbox token.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -139,7 +219,8 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
     setIsFocused(false);
     // Wait long enough for onPress to fire before clearing the list.
     // The isPressingSuggestion guard prevents clearing while the user is mid-tap.
-    setTimeout(() => {
+    if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
+    blurTimeoutRef.current = setTimeout(() => {
       if (!isPressingSuggestionRef.current) {
         setSuggestions([]);
       }
@@ -149,6 +230,7 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
     };
   }, []);
 
@@ -174,7 +256,10 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
             placeholderTextColor="#64748b"
             value={value}
             onChangeText={handleChangeText}
-            onFocus={() => setIsFocused(true)}
+            onFocus={() => {
+              if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
+              setIsFocused(true);
+            }}
             onBlur={handleBlur}
             returnKeyType="done"
           />
@@ -222,6 +307,10 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
           ))}
         </View>
       )}
+
+      {errorMessage ? (
+        <Text className="mt-2 text-xs text-amber-300">{errorMessage}</Text>
+      ) : null}
     </View>
   );
 }

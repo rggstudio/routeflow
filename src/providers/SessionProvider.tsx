@@ -301,6 +301,12 @@ export function SessionProvider({ children }: SessionProviderProps) {
         const nativeRedirectBase = makeRedirectUri(); // → exp://... in Expo Go
         const productionRedirect = makeRedirectUri({ scheme: 'routeflow', path: 'auth/callback' });
 
+        if (isExpoGo && !env.siteUrl) {
+          throw new Error(
+            'Google sign-in in Expo Go requires a real EXPO_PUBLIC_SITE_URL bounce page, or a custom dev build. Without that, Supabase falls back to its configured Site URL.'
+          );
+        }
+
         const redirectTo = isExpoGo && env.siteUrl
           ? `${env.siteUrl}?nativeRedirect=${encodeURIComponent(nativeRedirectBase)}`
           : productionRedirect;
@@ -327,6 +333,10 @@ export function SessionProvider({ children }: SessionProviderProps) {
 
         if (!data?.url) {
           throw new Error('Supabase did not return an authentication URL.');
+        }
+
+        if (__DEV__) {
+          console.log('[OAuth] provider url:', data.url);
         }
 
         const result = await WebBrowser.openAuthSessionAsync(data.url, watchUrl);
