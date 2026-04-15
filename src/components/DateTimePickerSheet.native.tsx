@@ -45,6 +45,49 @@ function isTimeSelectionAllowed(value: Date, timeConfig?: DateTimePickerSheetPro
   return true;
 }
 
+function clampTimeSelection(value: Date, timeConfig?: DateTimePickerSheetProps['timeConfig']) {
+  if (!timeConfig) {
+    return value;
+  }
+
+  const selectedMinutes = value.getHours() * 60 + value.getMinutes();
+  const minimumMinutes = timeConfig.minimumTime ? timeToMinutes(timeConfig.minimumTime) : null;
+  const maximumMinutes = timeConfig.maximumTime ? timeToMinutes(timeConfig.maximumTime) : null;
+  let nextMinutes = selectedMinutes;
+
+  if (minimumMinutes !== null && nextMinutes < minimumMinutes) {
+    nextMinutes = minimumMinutes;
+  }
+
+  if (maximumMinutes !== null && nextMinutes > maximumMinutes) {
+    nextMinutes = maximumMinutes;
+  }
+
+  if (nextMinutes === selectedMinutes) {
+    return value;
+  }
+
+  const next = new Date(value);
+  next.setHours(Math.floor(nextMinutes / 60), nextMinutes % 60, 0, 0);
+  return next;
+}
+
+function getTimeBoundaryDate(value: Date, time: string | undefined) {
+  if (!time) {
+    return undefined;
+  }
+
+  const minutes = timeToMinutes(time);
+
+  if (minutes === null) {
+    return undefined;
+  }
+
+  const next = new Date(value);
+  next.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+  return next;
+}
+
 function getInvalidTimeMessage(timeConfig?: DateTimePickerSheetProps['timeConfig']) {
   if (timeConfig?.minimumTime && timeConfig.maximumTime) {
     return `Choose a time between ${formatTime(timeConfig.minimumTime)} and ${formatTime(
@@ -72,11 +115,14 @@ export function DateTimePickerSheet({
   onCancel,
   onConfirm,
 }: DateTimePickerSheetProps) {
-  const [iosValue, setIosValue] = useState(value);
+  const [iosValue, setIosValue] = useState(clampTimeSelection(value, timeConfig));
 
   const confirmSelection = useCallback(
     (selectedValue: Date, closeOnInvalid = false) => {
-      if (mode === 'time' && !isTimeSelectionAllowed(selectedValue, timeConfig)) {
+      const normalizedValue =
+        mode === 'time' ? clampTimeSelection(selectedValue, timeConfig) : selectedValue;
+
+      if (mode === 'time' && !isTimeSelectionAllowed(normalizedValue, timeConfig)) {
         Alert.alert('Invalid time', getInvalidTimeMessage(timeConfig));
 
         if (closeOnInvalid) {
@@ -86,16 +132,16 @@ export function DateTimePickerSheet({
         return;
       }
 
-      onConfirm(selectedValue);
+      onConfirm(normalizedValue);
     },
     [mode, onCancel, onConfirm, timeConfig]
   );
 
   useEffect(() => {
     if (visible) {
-      setIosValue(value);
+      setIosValue(clampTimeSelection(value, timeConfig));
     }
-  }, [value, visible]);
+  }, [timeConfig, value, visible]);
 
   useEffect(() => {
     if (!visible || Platform.OS !== 'android') {
@@ -104,7 +150,7 @@ export function DateTimePickerSheet({
 
     DateTimePickerAndroid.open({
       mode,
-      value,
+      value: mode === 'time' ? clampTimeSelection(value, timeConfig) : value,
       is24Hour: false,
       display: mode === 'date' ? 'calendar' : 'spinner',
       onChange: (event: DateTimePickerEvent, selectedDate?: Date) => {
@@ -116,7 +162,7 @@ export function DateTimePickerSheet({
         onCancel();
       },
     });
-  }, [confirmSelection, mode, onCancel, value, visible]);
+  }, [confirmSelection, mode, onCancel, timeConfig, value, visible]);
 
   if (Platform.OS === 'android' || !visible) {
     return null;
@@ -148,9 +194,11 @@ export function DateTimePickerSheet({
                 ? (timeConfig?.minuteInterval as SupportedMinuteInterval | undefined)
                 : undefined
             }
+            minimumDate={mode === 'time' ? getTimeBoundaryDate(iosValue, timeConfig?.minimumTime) : undefined}
+            maximumDate={mode === 'time' ? getTimeBoundaryDate(iosValue, timeConfig?.maximumTime) : undefined}
             onChange={(_event, selectedDate) => {
               if (selectedDate) {
-                setIosValue(selectedDate);
+                setIosValue(mode === 'time' ? clampTimeSelection(selectedDate, timeConfig) : selectedDate);
               }
             }}
           />

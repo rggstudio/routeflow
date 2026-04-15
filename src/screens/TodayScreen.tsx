@@ -313,7 +313,13 @@ export function TodayScreen({ navigation }: Props) {
             label: 'Completed',
             kind: 'secondary',
             icon: 'checkmark-done-outline',
-            onPress: () => void updateOccurrenceStatus(inProgressRide.occurrence.id, 'completed'),
+            onPress: () =>
+              void runRideAction(
+                () => updateOccurrenceStatus(inProgressRide.occurrence.id, 'completed'),
+                'Ride completed',
+                'Complete ride failed',
+                inProgressRide.group.riderName + ' was marked completed.'
+              ),
           }}
         />
       ) : null}
@@ -335,7 +341,13 @@ export function TodayScreen({ navigation }: Props) {
             label: 'Picked Up',
             kind: 'secondary',
             icon: 'checkmark-circle-outline',
-            onPress: () => void updateOccurrenceStatus(nextRide.occurrence.id, 'in_progress'),
+            onPress: () =>
+              void runRideAction(
+                () => updateOccurrenceStatus(nextRide.occurrence.id, 'in_progress'),
+                'Ride started',
+                'Start ride failed',
+                nextRide.group.riderName + ' is now in progress.'
+              ),
           }}
           footerActions={
             isNextRideOverdue ? (

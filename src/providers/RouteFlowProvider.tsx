@@ -235,7 +235,8 @@ function buildRecurrenceRule(input: {
 function buildOccurrencesAndLegsForServiceDates(
   draft: RideDraft,
   groupId: string,
-  dates: string[]
+  dates: string[],
+  excludedLegKeys?: Set<string>
 ) {
   const occurrences: TablesInsert<'trip_occurrences'>[] = [];
   const legs: TablesInsert<'trip_legs'>[] = [];
@@ -243,44 +244,52 @@ function buildOccurrencesAndLegsForServiceDates(
   const splitPay = splitRoundTripPay(payAmount);
 
   for (const serviceDate of dates) {
-    const outboundOccurrenceId = createUuid();
-    occurrences.push({
-      id: outboundOccurrenceId,
-      trip_group_id: groupId,
-      service_date: serviceDate,
-      status: 'scheduled',
-      override_pay_amount: draft.tripType === 'round_trip' ? splitPay.outbound : null,
-    });
+    const outboundLegKey = `${serviceDate}:outbound`;
 
-    legs.push({
-      id: createUuid(),
-      trip_occurrence_id: outboundOccurrenceId,
-      leg_type: 'outbound',
-      pickup_address: draft.pickupAddress.trim(),
-      dropoff_address: draft.dropoffAddress.trim(),
-      pickup_time: draft.pickupTime.trim(),
-      status: 'scheduled',
-    });
-
-    if (draft.tripType === 'round_trip') {
-      const returnOccurrenceId = createUuid();
+    if (!excludedLegKeys?.has(outboundLegKey)) {
+      const outboundOccurrenceId = createUuid();
       occurrences.push({
-        id: returnOccurrenceId,
+        id: outboundOccurrenceId,
         trip_group_id: groupId,
         service_date: serviceDate,
         status: 'scheduled',
-        override_pay_amount: splitPay.return,
+        override_pay_amount: draft.tripType === 'round_trip' ? splitPay.outbound : null,
       });
 
       legs.push({
         id: createUuid(),
-        trip_occurrence_id: returnOccurrenceId,
-        leg_type: 'return',
-        pickup_address: draft.dropoffAddress.trim(),
-        dropoff_address: draft.returnDropoffAddress.trim() || draft.pickupAddress.trim(),
-        pickup_time: draft.returnPickupTime.trim(),
+        trip_occurrence_id: outboundOccurrenceId,
+        leg_type: 'outbound',
+        pickup_address: draft.pickupAddress.trim(),
+        dropoff_address: draft.dropoffAddress.trim(),
+        pickup_time: draft.pickupTime.trim(),
         status: 'scheduled',
       });
+    }
+
+    if (draft.tripType === 'round_trip') {
+      const returnLegKey = `${serviceDate}:return`;
+
+      if (!excludedLegKeys?.has(returnLegKey)) {
+        const returnOccurrenceId = createUuid();
+        occurrences.push({
+          id: returnOccurrenceId,
+          trip_group_id: groupId,
+          service_date: serviceDate,
+          status: 'scheduled',
+          override_pay_amount: splitPay.return,
+        });
+
+        legs.push({
+          id: createUuid(),
+          trip_occurrence_id: returnOccurrenceId,
+          leg_type: 'return',
+          pickup_address: draft.dropoffAddress.trim(),
+          dropoff_address: draft.returnDropoffAddress.trim() || draft.pickupAddress.trim(),
+          pickup_time: draft.returnPickupTime.trim(),
+          status: 'scheduled',
+        });
+      }
     }
   }
 
@@ -401,7 +410,7 @@ function buildInsertPayload(
   existingGroupId?: string,
   options?: {
     generationStartIso?: string;
-    excludedDates?: Set<string>;
+    excludedLegKeys?: Set<string>;
     recurrenceEndDate?: string | null;
   }
 ) {
@@ -447,10 +456,12 @@ function buildInsertPayload(
       )
     );
   }
-  const filteredDates = options?.excludedDates
-    ? dates.filter((date) => !options.excludedDates?.has(date))
-    : dates;
-  const { occurrences, legs } = buildOccurrencesAndLegsForServiceDates(draft, groupId, filteredDates);
+  const { occurrences, legs } = buildOccurrencesAndLegsForServiceDates(
+    draft,
+    groupId,
+    dates,
+    options?.excludedLegKeys
+  );
 
   return { group, occurrences, legs };
 }
@@ -858,11 +869,8 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
         const currentGroup = state.tripGroups.find((group) => group.id === groupId);
         const isOneTimeRide = draft.recurrenceType === 'none';
         const cutoffIso = todayIso();
-        const deletableOccurrences = state.tripOccurrences.filter((occurrence) => {
-          if (occurrence.tripGroupId !== groupId) {
-            return false;
-          }
-
+        const groupedOccurrences = state.tripOccurrences.filter((occurrence) => occurrence.tripGroupId === groupId);
+        const deletableOccurrences = groupedOccurrences.filter((occurrence) => {
           if (isOneTimeRide) {
             return true;
           }
@@ -872,18 +880,26 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
             (occurrence.serviceDate === cutoffIso && occurrence.status === 'scheduled')
           );
         });
-        const preservedDates = new Set(
-          state.tripOccurrences
-            .filter(
-              (occurrence) =>
-                occurrence.tripGroupId === groupId &&
-                !deletableOccurrences.some((candidate) => candidate.id === occurrence.id)
+        const legsByOccurrenceId = new Map<string, TripLeg[]>();
+
+        for (const leg of state.tripLegs) {
+          const current = legsByOccurrenceId.get(leg.tripOccurrenceId) ?? [];
+          current.push(leg);
+          legsByOccurrenceId.set(leg.tripOccurrenceId, current);
+        }
+
+        const excludedLegKeys = new Set(
+          groupedOccurrences
+            .filter((occurrence) => !deletableOccurrences.some((candidate) => candidate.id === occurrence.id))
+            .flatMap((occurrence) =>
+              (legsByOccurrenceId.get(occurrence.id) ?? []).map(
+                (leg) => `${occurrence.serviceDate}:${leg.legType}`
+              )
             )
-            .map((occurrence) => occurrence.serviceDate)
         );
         const payload = buildInsertPayload(draft, userId, groupId, {
           generationStartIso: isOneTimeRide ? draft.serviceDate : cutoffIso,
-          excludedDates: isOneTimeRide ? undefined : preservedDates,
+          excludedLegKeys: isOneTimeRide ? undefined : excludedLegKeys,
           recurrenceEndDate:
             isOneTimeRide || !currentGroup?.recurrenceEndDate ? null : currentGroup.recurrenceEndDate,
         });
@@ -1008,15 +1024,12 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
         const payload: {
           full_name: string | null;
           phone: string | null;
-          avatar_url?: string | null;
+          avatar_url: string | null;
         } = {
           full_name: profile.name.trim() || null,
           phone: profile.phone.trim() || null,
+          avatar_url: profile.avatarUrl.trim() || null,
         };
-
-        if (profile.avatarUrl.trim()) {
-          payload.avatar_url = profile.avatarUrl.trim();
-        }
 
         const { data: updatedProfile, error: updateError } = await client
           .from('profiles')

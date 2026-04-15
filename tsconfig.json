@@ -9,5 +9,9 @@
         "src/*"
       ]
     }
-  }
+  },
+  "exclude": [
+    "artifacts",
+    "node_modules"
+  ]
 }

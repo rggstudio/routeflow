@@ -21,6 +21,15 @@ type ToastContextValue = {
   hideToast: () => void;
 };
 
+type ToastPalette = {
+  border: string;
+  background: string;
+  title: string;
+  message: string;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  iconColor: string;
+};
+
 const TOAST_DURATION_MS = 2400;
 
 const ToastContext = createContext<ToastContextValue | undefined>(undefined);
@@ -106,7 +115,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [hideToast, showToast]
   );
 
-  const palette =
+  const palette: ToastPalette =
     toast?.tone === 'error'
       ? {
           border: 'border-rose-400/40',
