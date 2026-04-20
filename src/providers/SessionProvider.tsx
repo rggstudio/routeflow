@@ -7,9 +7,10 @@ import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
 
 import { env } from '@/config/env';
-import { supabase } from '@/lib/supabase';
+import { clearSupabaseSessionStorage, supabase } from '@/lib/supabase';
 
 const OWNER_ADMIN_EMAIL = 'shopmaster73@gmail.com';
+const STALE_REFRESH_TOKEN_PATTERN = /invalid refresh token|refresh token not found/i;
 
 let GoogleSignin: {
   configure: (opts: object) => void;
@@ -58,11 +59,17 @@ type SessionProviderProps = {
   children: ReactNode;
 };
 
+function isStaleRefreshTokenError(error: unknown) {
+  return error instanceof Error && STALE_REFRESH_TOKEN_PATTERN.test(error.message);
+}
+
 export function SessionProvider({ children }: SessionProviderProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(env.isSupabaseConfigured);
 
   useEffect(() => {
+    let isActive = true;
+
     if (!supabase) {
       setIsLoading(false);
       return;
@@ -70,10 +77,14 @@ export function SessionProvider({ children }: SessionProviderProps) {
     const client = supabase;
 
     const bootstrapUser = async (nextSession: Session | null) => {
-      setSession(nextSession);
+      if (isActive) {
+        setSession(nextSession);
+      }
 
       if (!nextSession) {
-        setIsLoading(false);
+        if (isActive) {
+          setIsLoading(false);
+        }
         return;
       }
 
@@ -83,45 +94,66 @@ export function SessionProvider({ children }: SessionProviderProps) {
           : (nextSession.user.email?.split('@')[0] ?? null);
       const isOwnerAdmin = nextSession.user.email?.trim().toLowerCase() === OWNER_ADMIN_EMAIL;
 
-      await client.from('profiles').upsert(
-        {
-          id: nextSession.user.id,
-          full_name: fallbackName,
-          phone: null,
-        },
-        {
-          onConflict: 'id',
-          ignoreDuplicates: true,
-        }
-      );
+      try {
+        await client.from('profiles').upsert(
+          {
+            id: nextSession.user.id,
+            full_name: fallbackName,
+            phone: null,
+          },
+          {
+            onConflict: 'id',
+            ignoreDuplicates: true,
+          }
+        );
 
-      if (isOwnerAdmin) {
-        await client
-          .from('profiles')
-          .update({ is_admin: true })
-          .eq('id', nextSession.user.id);
+        if (isOwnerAdmin) {
+          await client
+            .from('profiles')
+            .update({ is_admin: true })
+            .eq('id', nextSession.user.id);
+        }
+
+        await client.from('driver_preferences').upsert(
+          {
+            driver_id: nextSession.user.id,
+            default_navigation_app: 'google_maps',
+            notifications_enabled: true,
+            first_ride_summary_enabled: true,
+            first_ride_summary_time: '06:00',
+          },
+          {
+            onConflict: 'driver_id',
+            ignoreDuplicates: true,
+          }
+        );
+      } catch (error) {
+        console.warn('[Session] Failed to bootstrap Supabase profile state', error);
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
       }
-
-      await client.from('driver_preferences').upsert(
-        {
-          driver_id: nextSession.user.id,
-          default_navigation_app: 'google_maps',
-          notifications_enabled: true,
-          first_ride_summary_enabled: true,
-          first_ride_summary_time: '06:00',
-        },
-        {
-          onConflict: 'driver_id',
-          ignoreDuplicates: true,
-        }
-      );
-
-      setIsLoading(false);
     };
 
-    client.auth.getSession().then(({ data }) => {
-      void bootstrapUser(data.session);
-    });
+    const restoreSession = async () => {
+      const { data, error } = await client.auth.getSession();
+
+      if (error) {
+        if (isStaleRefreshTokenError(error)) {
+          await clearSupabaseSessionStorage();
+        } else {
+          console.warn('[Session] Failed to restore Supabase session', error);
+        }
+
+        await bootstrapUser(null);
+        return;
+      }
+
+      await bootstrapUser(data.session);
+    };
+
+    void restoreSession();
 
     const {
       data: { subscription },
@@ -130,6 +162,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
     });
 
     return () => {
+      isActive = false;
       subscription.unsubscribe();
     };
   }, []);
@@ -389,9 +422,15 @@ export function SessionProvider({ children }: SessionProviderProps) {
           throw new Error('Supabase is not configured.');
         }
 
+        const emailRedirectTo = env.siteUrl || undefined;
         const { error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
+          options: emailRedirectTo
+            ? {
+                emailRedirectTo,
+              }
+            : undefined,
         });
 
         if (error) {

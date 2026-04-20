@@ -30,6 +30,8 @@ const MAPBOX_TOKEN: string = env.mapboxKey;
 const SUGGEST_URL = 'https://api.mapbox.com/search/searchbox/v1/suggest';
 const RETRIEVE_URL = 'https://api.mapbox.com/search/searchbox/v1/retrieve';
 const FORWARD_URL = 'https://api.mapbox.com/search/searchbox/v1/forward';
+const MISSING_MAPBOX_MESSAGE =
+  'Address search is unavailable because this build is missing the Mapbox key.';
 
 function formatSuggestionValue(suggestion: Suggestion) {
   return (
@@ -56,7 +58,13 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
   const isPressingSuggestionRef = useRef(false);
 
   const fetchSuggestions = useCallback(async (query: string) => {
-    if (!MAPBOX_TOKEN || query.length < 3) {
+    if (!MAPBOX_TOKEN) {
+      setSuggestions([]);
+      setErrorMessage(MISSING_MAPBOX_MESSAGE);
+      return;
+    }
+
+    if (query.length < 3) {
       setSuggestions([]);
       setErrorMessage('');
       return;
@@ -154,9 +162,14 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
     onChangeText(text);
     lastQueryRef.current = text;
     suppressFetchRef.current = false;
-    setErrorMessage('');
+    setErrorMessage(text.length > 0 && !MAPBOX_TOKEN ? MISSING_MAPBOX_MESSAGE : '');
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (!MAPBOX_TOKEN) {
+      setSuggestions([]);
+      return;
+    }
 
     if (text.length < 3) {
       setSuggestions([]);
@@ -179,6 +192,7 @@ export function AddressAutocomplete({ label, value, onChangeText, placeholder, s
     Keyboard.dismiss();
 
     if (!MAPBOX_TOKEN) {
+      setErrorMessage(MISSING_MAPBOX_MESSAGE);
       return;
     }
 
