@@ -3,6 +3,7 @@ import { Alert, Pressable, Text, View } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { CancelRideWithPayModal } from '@/components/CancelRideWithPayModal';
 import { RideCard } from '@/components/RideCard';
 import { ActionButton, Screen, SectionCard, StatTile } from '@/components/ui';
 import {
@@ -189,6 +190,7 @@ export function TodayScreen({ navigation }: Props) {
   } = useRouteFlow();
   const { showToast } = useToast();
   const [now, setNow] = useState(() => new Date());
+  const [paidCancelRide, setPaidCancelRide] = useState<RideOccurrenceView | null>(null);
   const today = todayIso();
   const todaysRides = getOccurrencesForDate(today);
   const canceledTodayRides = getCanceledOccurrencesForDate(today);
@@ -230,11 +232,13 @@ export function TodayScreen({ navigation }: Props) {
     action: () => Promise<void>,
     successTitle: string,
     errorTitle: string,
-    successMessage?: string
+    successMessage?: string,
+    onSuccess?: () => void
   ) => {
     try {
       await action();
       showToast({ title: successTitle, message: successMessage });
+      onSuccess?.();
     } catch (error) {
       Alert.alert(errorTitle, error instanceof Error ? error.message : 'Try again.');
     }
@@ -258,23 +262,20 @@ export function TodayScreen({ navigation }: Props) {
   };
 
   const confirmCancelRideWithPay = (ride: RideOccurrenceView) => {
-    Alert.alert(
-      'Cancel ride with pay',
-      'This ride will be marked canceled, but the payment will still count.',
-      [
-        { text: 'Keep it', style: 'cancel' },
-        {
-          text: 'Cancel with pay',
-          style: 'destructive',
-          onPress: () =>
-            void runRideAction(
-              () => cancelOccurrenceWithPay(ride.occurrence.id),
-              'Ride canceled with pay',
-              'Cancel with pay failed',
-              ride.group.riderName + ' was canceled and payment was kept.'
-            ),
-        },
-      ]
+    setPaidCancelRide(ride);
+  };
+
+  const submitCancelRideWithPay = (payAmount: number) => {
+    if (!paidCancelRide) {
+      return;
+    }
+
+    void runRideAction(
+      () => cancelOccurrenceWithPay(paidCancelRide.occurrence.id, payAmount),
+      'Ride canceled with pay',
+      'Cancel with pay failed',
+      `${paidCancelRide.group.riderName} was canceled and $${payAmount.toFixed(2)} was kept.`,
+      () => setPaidCancelRide(null)
     );
   };
 
@@ -449,6 +450,14 @@ export function TodayScreen({ navigation }: Props) {
           ))}
         </>
       ) : null}
+
+      <CancelRideWithPayModal
+        visible={!!paidCancelRide}
+        riderName={paidCancelRide?.group.riderName ?? ''}
+        defaultAmount={paidCancelRide?.effectivePay ?? 0}
+        onClose={() => setPaidCancelRide(null)}
+        onSubmit={submitCancelRideWithPay}
+      />
     </Screen>
   );
 }

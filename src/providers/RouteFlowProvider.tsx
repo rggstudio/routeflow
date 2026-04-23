@@ -25,7 +25,7 @@ import {
   TripLeg,
   TripOccurrence,
 } from '@/types/ride';
-import { Tables, TablesInsert } from '@/types/supabase';
+import { Tables, TablesInsert, TablesUpdate } from '@/types/supabase';
 
 const RECURRING_LOOKAHEAD_DAYS = 90;
 const OWNER_ADMIN_EMAIL = 'shopmaster73@gmail.com';
@@ -62,7 +62,7 @@ type RouteFlowContextValue = {
   updateRide: (groupId: string, draft: RideDraft) => Promise<void>;
   updateOccurrenceStatus: (occurrenceId: string, status: RideStatus) => Promise<void>;
   cancelOccurrence: (occurrenceId: string) => Promise<void>;
-  cancelOccurrenceWithPay: (occurrenceId: string) => Promise<void>;
+  cancelOccurrenceWithPay: (occurrenceId: string, payAmount?: number) => Promise<void>;
   deleteSeriesFromOccurrence: (occurrenceId: string) => Promise<void>;
   updateProfile: (profile: DriverProfile) => Promise<void>;
   updatePreferences: (preferences: DriverPreferences) => Promise<UpdatePreferencesResult>;
@@ -195,6 +195,38 @@ function splitRoundTripPay(totalAmount: number) {
     outbound: outboundCents / 100,
     return: returnCents / 100,
   };
+}
+
+function roundCurrencyAmount(amount: number) {
+  return Math.round(amount * 100) / 100;
+}
+
+function getDefaultOccurrenceOverridePayAmount(
+  occurrenceId: string,
+  tripOccurrences: TripOccurrence[],
+  tripGroups: TripGroup[],
+  tripLegs: TripLeg[]
+) {
+  const occurrence = tripOccurrences.find((item) => item.id === occurrenceId);
+
+  if (!occurrence) {
+    return null;
+  }
+
+  const group = tripGroups.find((item) => item.id === occurrence.tripGroupId);
+
+  if (!group || group.tripType !== 'round_trip') {
+    return null;
+  }
+
+  const occurrenceLegs = tripLegs.filter((item) => item.tripOccurrenceId === occurrenceId);
+
+  if (occurrenceLegs.length !== 1) {
+    return null;
+  }
+
+  const splitPay = splitRoundTripPay(group.payAmount);
+  return splitPay[occurrenceLegs[0].legType];
 }
 
 function isOwnerEmail(email?: string | null) {
@@ -747,12 +779,17 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
   }, [session, syncRecurringCoverage]);
 
   const setOccurrenceStatus = useCallback(
-    async (occurrenceId: string, status: RideStatus) => {
+    async (occurrenceId: string, status: RideStatus, overridePayAmount?: number | null) => {
       const { client } = requireSignedInClient();
+      const occurrenceUpdate: TablesUpdate<'trip_occurrences'> = { status };
+
+      if (overridePayAmount !== undefined) {
+        occurrenceUpdate.override_pay_amount = overridePayAmount;
+      }
 
       const { data: updatedOccurrences, error: occurrenceError } = await client
         .from('trip_occurrences')
-        .update({ status })
+        .update(occurrenceUpdate)
         .eq('id', occurrenceId)
         .select('id');
 
@@ -957,12 +994,43 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
         await loadState();
       },
       updateOccurrenceStatus: async (occurrenceId, status) => {
-        await setOccurrenceStatus(occurrenceId, status);
+        const currentOccurrence = state.tripOccurrences.find((occurrence) => occurrence.id === occurrenceId);
+        const resetOverridePayAmount =
+          currentOccurrence?.status === 'canceled_paid' && status !== 'canceled_paid'
+            ? getDefaultOccurrenceOverridePayAmount(
+                occurrenceId,
+                state.tripOccurrences,
+                state.tripGroups,
+                state.tripLegs
+              )
+            : undefined;
+
+        await setOccurrenceStatus(occurrenceId, status, resetOverridePayAmount);
       },
       cancelOccurrence: async (occurrenceId) => {
-        await setOccurrenceStatus(occurrenceId, 'canceled');
+        const currentOccurrence = state.tripOccurrences.find((occurrence) => occurrence.id === occurrenceId);
+        const resetOverridePayAmount =
+          currentOccurrence?.status === 'canceled_paid'
+            ? getDefaultOccurrenceOverridePayAmount(
+                occurrenceId,
+                state.tripOccurrences,
+                state.tripGroups,
+                state.tripLegs
+              )
+            : undefined;
+
+        await setOccurrenceStatus(occurrenceId, 'canceled', resetOverridePayAmount);
       },
-      cancelOccurrenceWithPay: async (occurrenceId) => {
+      cancelOccurrenceWithPay: async (occurrenceId, payAmount) => {
+        if (payAmount !== undefined) {
+          if (!Number.isFinite(payAmount) || payAmount < 0) {
+            throw new Error('Paid cancel amount must be zero or more.');
+          }
+
+          await setOccurrenceStatus(occurrenceId, 'canceled_paid', roundCurrencyAmount(payAmount));
+          return;
+        }
+
         await setOccurrenceStatus(occurrenceId, 'canceled_paid');
       },
       deleteSeriesFromOccurrence: async (occurrenceId) => {

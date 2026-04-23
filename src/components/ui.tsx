@@ -247,7 +247,7 @@ type InputFieldProps = {
   onChangeText: (value: string) => void;
   placeholder?: string;
   multiline?: boolean;
-  keyboardType?: 'default' | 'phone-pad' | 'numeric';
+  keyboardType?: 'default' | 'phone-pad' | 'numeric' | 'decimal-pad';
   secureTextEntry?: boolean;
 };
 

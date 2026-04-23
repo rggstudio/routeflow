@@ -1,8 +1,10 @@
 import { Alert, ScrollView, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useState } from 'react';
 
 import { BottomSheetScreen } from '@/components/BottomSheetScreen';
+import { CancelRideWithPayModal } from '@/components/CancelRideWithPayModal';
 import { ActionButton, SectionCard } from '@/components/ui';
 import { formatTime, getLongDateLabel } from '@/lib/date';
 import {
@@ -27,6 +29,7 @@ const statusActions: RideStatus[] = [
 ];
 
 export function RideDetailScreen({ navigation, route }: Props) {
+  const [paidCancelOnSuccess, setPaidCancelOnSuccess] = useState<(() => void) | null>(null);
   const {
     state,
     getOccurrenceView,
@@ -78,6 +81,30 @@ export function RideDetailScreen({ navigation, route }: Props) {
   const pairedLabel =
     view.pairedLeg?.legType === 'return' ? 'Paired return' : 'Paired outbound';
   const isRecurringSeries = view.group.recurrenceType !== 'none';
+  const isPaidCancelModalVisible = paidCancelOnSuccess !== null;
+
+  const openPaidCancelModal = (onSuccess?: () => void) => {
+    setPaidCancelOnSuccess(() => onSuccess ?? (() => undefined));
+  };
+
+  const closePaidCancelModal = () => {
+    setPaidCancelOnSuccess(null);
+  };
+
+  const submitCancelRideWithPay = (payAmount: number) => {
+    const handleSuccess = paidCancelOnSuccess;
+
+    void runRideAction(
+      () => cancelOccurrenceWithPay(view.occurrence.id, payAmount),
+      'Ride canceled with pay',
+      'Cancel with pay failed',
+      `${view.group.riderName} was canceled and $${payAmount.toFixed(2)} was kept.`,
+      () => {
+        closePaidCancelModal();
+        handleSuccess?.();
+      }
+    );
+  };
 
   return (
     <BottomSheetScreen onClose={() => navigation.goBack()}>
@@ -190,14 +217,19 @@ export function RideDetailScreen({ navigation, route }: Props) {
                   <ActionButton
                     label={getStatusLabel(status)}
                     kind={view.occurrence.status === status ? 'primary' : 'secondary'}
-                    onPress={() =>
-                      runRideAction(
+                    onPress={() => {
+                      if (status === 'canceled_paid') {
+                        openPaidCancelModal();
+                        return;
+                      }
+
+                      void runRideAction(
                         () => updateOccurrenceStatus(view.occurrence.id, status),
                         'Ride status updated',
                         'Status update failed',
                         `${view.group.riderName} is now ${getStatusLabel(status).toLowerCase()}.`
-                      )
-                    }
+                      );
+                    }}
                   />
                 </View>
               ))}
@@ -235,27 +267,7 @@ export function RideDetailScreen({ navigation, route }: Props) {
               <ActionButton
                 label="Cancel Ride with Pay"
                 kind="danger"
-                onPress={() =>
-                  Alert.alert(
-                    'Cancel Ride with Pay',
-                    'This ride will be marked canceled, but the payment will still count.',
-                    [
-                      { text: 'Keep it', style: 'cancel' },
-                      {
-                        text: 'Cancel with pay',
-                        style: 'destructive',
-                        onPress: () =>
-                          void runRideAction(
-                            () => cancelOccurrenceWithPay(view.occurrence.id),
-                            'Ride canceled with pay',
-                            'Cancel with pay failed',
-                            `${view.group.riderName} was canceled and payment was kept.`,
-                            () => navigation.goBack()
-                          ),
-                      },
-                    ]
-                  )
-                }
+                onPress={() => openPaidCancelModal(() => navigation.goBack())}
               />
               {isRecurringSeries ? (
                 <ActionButton
@@ -287,6 +299,13 @@ export function RideDetailScreen({ navigation, route }: Props) {
             </View>
           </SectionCard>
         </ScrollView>
+        <CancelRideWithPayModal
+          visible={isPaidCancelModalVisible}
+          riderName={view.group.riderName}
+          defaultAmount={view.effectivePay}
+          onClose={closePaidCancelModal}
+          onSubmit={submitCancelRideWithPay}
+        />
       </View>
     </BottomSheetScreen>
   );
