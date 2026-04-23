@@ -1,5 +1,5 @@
-import { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, type StyleProp, Switch, Text, TextInput, type ViewStyle, View } from 'react-native';
+import { ReactNode, useRef } from 'react';
+import { Animated, KeyboardAvoidingView, Platform, Pressable, type StyleProp, Switch, Text, TextInput, type ViewStyle, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -14,6 +14,13 @@ type ScreenProps = {
 };
 
 export function Screen({ children, scroll = true, avatarPlacement = 'right', paddingTop = 20, keyboardAware = false }: ScreenProps) {
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const navigationFadeOpacity = scrollY.interpolate({
+    inputRange: [0, 36],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
   const rightAvatar =
     avatarPlacement === 'right' ? (
       <View className="absolute right-0 top-0 z-10">
@@ -22,16 +29,36 @@ export function Screen({ children, scroll = true, avatarPlacement = 'right', pad
     ) : null;
 
   const scrollView = (
-    <ScrollView
-      contentContainerStyle={{ padding: 20, paddingTop, paddingBottom: 140 }}
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode="interactive"
-    >
-      <View className="relative">
-        {rightAvatar}
-        {children}
-      </View>
-    </ScrollView>
+    <View className="flex-1">
+      <Animated.ScrollView
+        contentContainerStyle={{ padding: 20, paddingTop, paddingBottom: 140 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true },
+        )}
+        scrollEventThrottle={16}
+      >
+        <View className="relative">
+          {rightAvatar}
+          {children}
+        </View>
+      </Animated.ScrollView>
+
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          opacity: navigationFadeOpacity,
+        }}
+        className="absolute bottom-0 left-0 right-0 h-36"
+      >
+        <View className="absolute bottom-0 left-0 right-0 h-24 bg-slate-950" />
+        <View className="absolute bottom-24 left-0 right-0 h-5 bg-slate-950/80" />
+        <View className="absolute bottom-28 left-0 right-0 h-4 bg-slate-950/60" />
+        <View className="absolute bottom-31 left-0 right-0 h-3 bg-slate-950/40" />
+      </Animated.View>
+    </View>
   );
 
   const content = scroll ? (
