@@ -6,6 +6,10 @@ function encode(value: string) {
   return encodeURIComponent(value);
 }
 
+function isPostPickupStatus(status: RideStatus) {
+  return status === 'in_progress' || status === 'completed';
+}
+
 export function getStatusLabel(status: RideStatus) {
   switch (status) {
     case 'scheduled':
@@ -24,15 +28,20 @@ export function getStatusLabel(status: RideStatus) {
 }
 
 export async function openNavigation(view: RideOccurrenceView, preferences: DriverPreferences) {
-  const origin = view.activeLeg.pickupAddress;
-  const destination = view.activeLeg.dropoffAddress;
+  const isPostPickup = isPostPickupStatus(view.occurrence.status);
+  const pickupAddress = view.activeLeg.pickupAddress;
+  const destination = isPostPickup ? view.activeLeg.dropoffAddress : pickupAddress;
 
   const urls: Record<NavigationApp, string> = {
     // Waze deep links navigate from the driver's current location and do not support
     // passing a separate start address the way Google Maps and Apple Maps do.
     waze: `https://waze.com/ul?q=${encode(destination)}&navigate=yes`,
-    google_maps: `https://www.google.com/maps/dir/?api=1&origin=${encode(origin)}&destination=${encode(destination)}&travelmode=driving`,
-    apple_maps: `http://maps.apple.com/?saddr=${encode(origin)}&daddr=${encode(destination)}`,
+    google_maps: isPostPickup
+      ? `https://www.google.com/maps/dir/?api=1&origin=${encode(pickupAddress)}&destination=${encode(destination)}&travelmode=driving`
+      : `https://www.google.com/maps/dir/?api=1&destination=${encode(destination)}&travelmode=driving`,
+    apple_maps: isPostPickup
+      ? `http://maps.apple.com/?saddr=${encode(pickupAddress)}&daddr=${encode(destination)}`
+      : `http://maps.apple.com/?daddr=${encode(destination)}`,
   };
 
   const preferredUrl = urls[preferences.defaultNavigationApp];
