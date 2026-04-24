@@ -51,6 +51,7 @@ type SessionContextValue = {
   signInWithOAuth: (provider: SocialAuthProvider) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
 };
 
 const SessionContext = createContext<SessionContextValue | undefined>(undefined);
@@ -451,6 +452,28 @@ export function SessionProvider({ children }: SessionProviderProps) {
         }
 
         await supabase.auth.signOut();
+      },
+      deleteAccount: async () => {
+        if (!supabase) {
+          throw new Error('Supabase is not configured.');
+        }
+
+        const { error } = await supabase.rpc('delete_current_user_account');
+
+        if (error) {
+          throw error;
+        }
+
+        if (Platform.OS !== 'web' && GoogleSignin) {
+          try {
+            await GoogleSignin.signOut();
+          } catch {
+            // If Google Sign-In wasn't used, this is a no-op
+          }
+        }
+
+        await clearSupabaseSessionStorage();
+        setSession(null);
       },
     }),
     [isLoading, session]

@@ -23,6 +23,12 @@ module.exports = () => {
         buildNumber: "10",
         infoPlist: {
           ITSAppUsesNonExemptEncryption: false,
+          NSCameraUsageDescription:
+            "RouteFlow Driver uses the camera only if you choose to take a driver profile photo, for example when updating your account avatar.",
+          NSPhotoLibraryUsageDescription:
+            "RouteFlow Driver uses your photo library only when you choose a driver profile photo, for example selecting an image for your account avatar.",
+          NSPhotoLibraryAddUsageDescription:
+            "RouteFlow Driver may save generated report images to your photo library only when you choose to export or share them.",
         },
       },
       android: {
@@ -43,6 +49,15 @@ module.exports = () => {
         "expo-secure-store",
         "@react-native-community/datetimepicker",
         "expo-web-browser",
+        [
+          "expo-image-picker",
+          {
+            cameraPermission:
+              "RouteFlow Driver uses the camera only if you choose to take a driver profile photo, for example when updating your account avatar.",
+            photosPermission:
+              "RouteFlow Driver uses your photo library only when you choose a driver profile photo, for example selecting an image for your account avatar.",
+          },
+        ],
         [
           "@react-native-google-signin/google-signin",
           {

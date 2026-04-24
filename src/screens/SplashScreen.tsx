@@ -1,11 +1,11 @@
-import { Alert, Image, Text, View } from 'react-native';
+import { Alert, Image, Platform, Text, View } from 'react-native';
 import { useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { SocialAuthButton } from '@/components/SocialAuthButton';
 import { ActionButton, Screen } from '@/components/ui';
-import { useSession } from '@/providers/SessionProvider';
+import { SocialAuthProvider, useSession } from '@/providers/SessionProvider';
 import { RootStackParamList } from '@/types/navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
@@ -14,29 +14,34 @@ const valuePoints = [
   'Never lose a ride in your messages',
   'Track your weekly earnings automatically',
   'Handle recurring routes with ease',
-  'Send quick updates like "On my way" in one tap',
 ];
 
 export function SplashScreen({ navigation }: Props) {
   const { isLoading, signInWithOAuth } = useSession();
+  const [isAppleLoading, setIsAppleLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const socialProviders: SocialAuthProvider[] =
+    Platform.OS === 'ios' ? ['apple', 'google'] : ['google'];
 
-  const handleGoogleAuth = async () => {
+  const handleSocialAuth = async (provider: SocialAuthProvider) => {
+    const setProviderLoading = provider === 'apple' ? setIsAppleLoading : setIsGoogleLoading;
+    const providerName = provider === 'apple' ? 'Apple' : 'Google';
+
     try {
-      setIsGoogleLoading(true);
-      await signInWithOAuth('google');
+      setProviderLoading(true);
+      await signInWithOAuth(provider);
     } catch (error) {
       Alert.alert(
-        'Google sign-in failed',
+        `${providerName} sign-in failed`,
         error instanceof Error ? error.message : 'Try again.'
       );
     } finally {
-      setIsGoogleLoading(false);
+      setProviderLoading(false);
     }
   };
 
   return (
-    <Screen avatarPlacement="none">
+    <Screen avatarPlacement="none" showBottomFade={false}>
       <View className="min-h-full justify-center">
         <View className="items-center pt-6">
           <Image
@@ -58,13 +63,16 @@ export function SplashScreen({ navigation }: Props) {
           </Text>
         </View>
 
-        <View className="mt-8">
-          <SocialAuthButton
-            provider="google"
-            disabled={isLoading || isGoogleLoading}
-            isLoading={isGoogleLoading}
-            onPress={handleGoogleAuth}
-          />
+        <View className="mt-8 gap-3">
+          {socialProviders.map((provider) => (
+            <SocialAuthButton
+              key={provider}
+              provider={provider}
+              disabled={isLoading || isAppleLoading || isGoogleLoading}
+              isLoading={provider === 'apple' ? isAppleLoading : isGoogleLoading}
+              onPress={() => handleSocialAuth(provider)}
+            />
+          ))}
         </View>
 
         <View className="mt-8 rounded-[28px] border border-white/10 bg-slate-900/80 px-5 py-5">

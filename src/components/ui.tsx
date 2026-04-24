@@ -11,9 +11,17 @@ type ScreenProps = {
   avatarPlacement?: 'right' | 'center' | 'none';
   paddingTop?: number;
   keyboardAware?: boolean;
+  showBottomFade?: boolean;
 };
 
-export function Screen({ children, scroll = true, avatarPlacement = 'right', paddingTop = 20, keyboardAware = false }: ScreenProps) {
+export function Screen({
+  children,
+  scroll = true,
+  avatarPlacement = 'right',
+  paddingTop = 20,
+  keyboardAware = false,
+  showBottomFade = true,
+}: ScreenProps) {
   const scrollY = useRef(new Animated.Value(0)).current;
   const navigationFadeOpacity = scrollY.interpolate({
     inputRange: [0, 36],
@@ -46,18 +54,20 @@ export function Screen({ children, scroll = true, avatarPlacement = 'right', pad
         </View>
       </Animated.ScrollView>
 
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          opacity: navigationFadeOpacity,
-        }}
-        className="absolute bottom-0 left-0 right-0 h-36"
-      >
-        <View className="absolute bottom-0 left-0 right-0 h-24 bg-slate-950" />
-        <View className="absolute bottom-24 left-0 right-0 h-5 bg-slate-950/80" />
-        <View className="absolute bottom-28 left-0 right-0 h-4 bg-slate-950/60" />
-        <View className="absolute bottom-31 left-0 right-0 h-3 bg-slate-950/40" />
-      </Animated.View>
+      {showBottomFade ? (
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            opacity: navigationFadeOpacity,
+          }}
+          className="absolute bottom-0 left-0 right-0 h-36"
+        >
+          <View className="absolute bottom-0 left-0 right-0 h-24 bg-slate-950" />
+          <View className="absolute bottom-24 left-0 right-0 h-5 bg-slate-950/80" />
+          <View className="absolute bottom-28 left-0 right-0 h-4 bg-slate-950/60" />
+          <View className="absolute bottom-31 left-0 right-0 h-3 bg-slate-950/40" />
+        </Animated.View>
+      ) : null}
     </View>
   );
 
@@ -172,6 +182,7 @@ type ActionButtonProps = {
   onPress: () => void;
   kind?: 'primary' | 'secondary' | 'ghost' | 'danger';
   icon?: keyof typeof Ionicons.glyphMap;
+  disabled?: boolean;
 };
 
 export function ActionButton({
@@ -179,6 +190,7 @@ export function ActionButton({
   onPress,
   kind = 'secondary',
   icon,
+  disabled = false,
 }: ActionButtonProps) {
   const iconOnly = !!icon && !label;
 
@@ -203,7 +215,8 @@ export function ActionButton({
 
   return (
     <Pressable
-      className={`rounded-full active:opacity-80 ${iconOnly ? 'px-4 py-4' : 'px-4 py-3'} ${classes[kind]}`}
+      className={`rounded-full active:opacity-80 ${disabled ? 'opacity-60' : ''} ${iconOnly ? 'px-4 py-4' : 'px-4 py-3'} ${classes[kind]}`}
+      disabled={disabled}
       onPress={onPress}
     >
       <View className="flex-row items-center justify-center gap-1.5">

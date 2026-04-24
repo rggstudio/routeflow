@@ -105,16 +105,43 @@ function getMorningSummaryTimeValue(time: string) {
   return getTimeDate(todayIso(), safeTime);
 }
 
+function getAvatarStorageObject(avatarUrl: string) {
+  if (!avatarUrl) {
+    return null;
+  }
+
+  const marker = '/object/public/';
+  const markerIndex = avatarUrl.indexOf(marker);
+
+  if (markerIndex === -1) {
+    return null;
+  }
+
+  const objectParts = avatarUrl
+    .slice(markerIndex + marker.length)
+    .split('/')
+    .filter(Boolean);
+  const bucket = objectParts.shift();
+  const path = objectParts.join('/');
+
+  if (!bucket || !path || !avatarBuckets.includes(bucket as (typeof avatarBuckets)[number])) {
+    return null;
+  }
+
+  return { bucket, path };
+}
+
 export function AccountScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { state, updateProfile, updatePreferences } = useRouteFlow();
-  const { isConfigured, session, signOut } = useSession();
+  const { deleteAccount, isConfigured, session, signOut } = useSession();
   const { showToast } = useToast();
   const [profileDraft, setProfileDraft] = useState(state.profile);
   const [preferencesDraft, setPreferencesDraft] = useState(state.preferences);
   const [pendingAvatarAsset, setPendingAvatarAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [isMorningSummaryPickerVisible, setIsMorningSummaryPickerVisible] = useState(false);
 
   useEffect(() => {
@@ -298,6 +325,53 @@ export function AccountScreen() {
     setIsMorningSummaryPickerVisible(false);
   };
 
+  const performDeleteAccount = async () => {
+    try {
+      setIsDeletingAccount(true);
+
+      const avatarObject = getAvatarStorageObject(state.profile.avatarUrl);
+
+      if (supabase && avatarObject) {
+        const { error: avatarDeleteError } = await supabase.storage
+          .from(avatarObject.bucket)
+          .remove([avatarObject.path]);
+
+        if (avatarDeleteError) {
+          console.warn('[Account] Failed to delete avatar during account deletion', avatarDeleteError);
+        }
+      }
+
+      await deleteAccount();
+      Alert.alert(
+        'Account deleted',
+        'Your RouteFlow Driver account and app data were deleted.'
+      );
+    } catch (error) {
+      setIsDeletingAccount(false);
+      Alert.alert('Account deletion failed', getErrorMessage(error));
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete account?',
+      'This permanently deletes your RouteFlow Driver account, profile, rides, preferences, and ride history. This cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete account',
+          style: 'destructive',
+          onPress: () => {
+            void performDeleteAccount();
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <Screen avatarPlacement="none">
       <View className="mb-6">
@@ -461,6 +535,20 @@ export function AccountScreen() {
           </View>
         ) : null}
       </SectionCard>
+
+      {session ? (
+        <SectionCard title="Delete Account">
+          <Text className="mb-4 text-sm leading-6 text-slate-300">
+            Permanently delete your account, profile, rides, preferences, and ride history.
+          </Text>
+          <ActionButton
+            label={isDeletingAccount ? 'Deleting account...' : 'Delete account'}
+            kind="danger"
+            disabled={isDeletingAccount}
+            onPress={handleDeleteAccount}
+          />
+        </SectionCard>
+      ) : null}
 
       <View className="pb-6 pt-2">
         <Text className="text-center text-xs font-medium uppercase tracking-[1.8px] text-slate-500">

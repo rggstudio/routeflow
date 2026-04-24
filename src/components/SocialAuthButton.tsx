@@ -23,9 +23,9 @@ const socialProviders: Record<
   apple: {
     label: 'Continue with Apple',
     icon: 'logo-apple',
-    buttonClassName: 'border-black bg-black',
-    textClassName: 'text-white',
-    iconColor: '#ffffff',
+    buttonClassName: 'border-white bg-white',
+    textClassName: 'text-slate-950',
+    iconColor: '#0f172a',
   },
   google: {
     label: 'Continue with Google',
