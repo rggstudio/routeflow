@@ -13,6 +13,12 @@ begin
     raise exception 'Not authenticated';
   end if;
 
+  perform set_config('app.account_deletion', 'on', true);
+
+  delete from public.ride_audit_log
+  where driver_id = _user_id
+     or actor_user_id = _user_id;
+
   delete from auth.users
   where id = _user_id;
 
