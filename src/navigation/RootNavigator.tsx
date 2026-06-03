@@ -9,6 +9,7 @@ import { AdminDashboardScreen } from '@/screens/AdminDashboardScreen';
 import { RideDetailScreen } from '@/screens/RideDetailScreen';
 import { RideFormScreen } from '@/screens/RideFormScreen';
 import { SplashScreen } from '@/screens/SplashScreen';
+import { TripNavigationScreen } from '@/screens/TripNavigationScreen';
 import { WeeklyReportScreen } from '@/screens/WeeklyReportScreen';
 import { RootStackParamList } from '@/types/navigation';
 import { Text, View } from 'react-native';
@@ -83,6 +84,14 @@ export function RootNavigator() {
                 contentStyle: {
                   backgroundColor: 'transparent',
                 },
+              }}
+            />
+            <Stack.Screen
+              name="TripNavigation"
+              component={TripNavigationScreen}
+              options={{
+                headerShown: false,
+                animation: 'slide_from_right',
               }}
             />
             <Stack.Screen

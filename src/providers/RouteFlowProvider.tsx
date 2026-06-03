@@ -61,6 +61,11 @@ type RouteFlowContextValue = {
   addRide: (draft: RideDraft) => Promise<void>;
   updateRide: (groupId: string, draft: RideDraft) => Promise<void>;
   updateOccurrenceStatus: (occurrenceId: string, status: RideStatus) => Promise<void>;
+  recordOccurrenceNote: (
+    occurrenceId: string,
+    note: string,
+    metadata?: Record<string, string | number | boolean | null>
+  ) => Promise<void>;
   cancelOccurrence: (occurrenceId: string) => Promise<void>;
   cancelOccurrenceWithPay: (occurrenceId: string, payAmount?: number) => Promise<void>;
   deleteSeriesFromOccurrence: (occurrenceId: string) => Promise<void>;
@@ -1006,6 +1011,39 @@ export function RouteFlowProvider({ children }: RouteFlowProviderProps) {
             : undefined;
 
         await setOccurrenceStatus(occurrenceId, status, resetOverridePayAmount);
+      },
+      recordOccurrenceNote: async (occurrenceId, note, metadata = {}) => {
+        const { client } = requireSignedInClient();
+        const currentOccurrence = state.tripOccurrences.find((occurrence) => occurrence.id === occurrenceId);
+
+        if (!currentOccurrence) {
+          throw new Error('Ride not found or it was already removed.');
+        }
+
+        const verificationMeta = {
+          event_type: metadata.event_type ?? 'ride_note',
+          recorded_at: new Date().toISOString(),
+          ...metadata,
+        };
+
+        const { data, error } = await client
+          .from('trip_occurrences')
+          .update({
+            verification_note: note,
+            verification_meta: verificationMeta,
+          })
+          .eq('id', occurrenceId)
+          .select('id');
+
+        if (error) {
+          throw new Error(error.message ?? 'Failed to record ride note.');
+        }
+
+        if (!data || data.length === 0) {
+          throw new Error('Ride not found or you do not have permission to update it.');
+        }
+
+        await loadState();
       },
       cancelOccurrence: async (occurrenceId) => {
         const currentOccurrence = state.tripOccurrences.find((occurrence) => occurrence.id === occurrenceId);

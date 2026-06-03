@@ -27,12 +27,12 @@ export function getStatusLabel(status: RideStatus) {
   }
 }
 
-export async function openNavigation(view: RideOccurrenceView, preferences: DriverPreferences) {
+function getNavigationUrls(view: RideOccurrenceView) {
   const isPostPickup = isPostPickupStatus(view.occurrence.status);
   const pickupAddress = view.activeLeg.pickupAddress;
   const destination = isPostPickup ? view.activeLeg.dropoffAddress : pickupAddress;
 
-  const urls: Record<NavigationApp, string> = {
+  return {
     // Waze deep links navigate from the driver's current location and do not support
     // passing a separate start address the way Google Maps and Apple Maps do.
     waze: `https://waze.com/ul?q=${encode(destination)}&navigate=yes`,
@@ -43,6 +43,23 @@ export async function openNavigation(view: RideOccurrenceView, preferences: Driv
       ? `http://maps.apple.com/?saddr=${encode(pickupAddress)}&daddr=${encode(destination)}`
       : `http://maps.apple.com/?daddr=${encode(destination)}`,
   };
+}
+
+export async function openNavigationApp(view: RideOccurrenceView, app: NavigationApp) {
+  const urls = getNavigationUrls(view);
+  const url = urls[app];
+  const supported = await Linking.canOpenURL(url);
+
+  if (!supported) {
+    Alert.alert('Map app unavailable', 'RouteFlow could not open that navigation app on this device.');
+    return;
+  }
+
+  await Linking.openURL(url);
+}
+
+export async function openNavigation(view: RideOccurrenceView, preferences: DriverPreferences) {
+  const urls: Record<NavigationApp, string> = getNavigationUrls(view);
 
   const preferredUrl = urls[preferences.defaultNavigationApp];
   const fallbackUrls = Object.values(urls).filter((url) => url !== preferredUrl);
@@ -58,6 +75,23 @@ export async function openNavigation(view: RideOccurrenceView, preferences: Driv
   }
 
   Alert.alert('No map app available', 'RouteFlow could not open a navigation app on this device.');
+}
+
+export async function callPhoneNumber(phone: string) {
+  if (!phone.trim()) {
+    Alert.alert('No phone number', 'Add a rider phone number to call from RouteFlow.');
+    return;
+  }
+
+  const url = `tel:${phone}`;
+  const supported = await Linking.canOpenURL(url);
+
+  if (!supported) {
+    Alert.alert('Calling unavailable', 'This device cannot open the phone dialer right now.');
+    return;
+  }
+
+  await Linking.openURL(url);
 }
 
 export async function sendQuickMessage(phone: string, body: string) {

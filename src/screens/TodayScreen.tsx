@@ -44,6 +44,8 @@ type HomeRideSpotlightProps = {
   today: string;
   todaysRides: RideOccurrenceView[];
   onNavigate: () => void;
+  primaryActionLabel?: string;
+  primaryActionIcon?: keyof typeof Ionicons.glyphMap;
   secondaryAction: {
     label: string;
     kind?: 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -61,6 +63,8 @@ function HomeRideSpotlight({
   today,
   todaysRides,
   onNavigate,
+  primaryActionLabel = 'Navigate',
+  primaryActionIcon = 'navigate-outline',
   secondaryAction,
   footerActions,
   statusTone = 'default',
@@ -132,7 +136,12 @@ function HomeRideSpotlight({
       ) : null}
 
       <View className="mt-5 gap-3">
-        <ActionButton label="Navigate" kind="primary" icon="navigate-outline" onPress={onNavigate} />
+        <ActionButton
+          label={primaryActionLabel}
+          kind="primary"
+          icon={primaryActionIcon}
+          onPress={onNavigate}
+        />
         <ActionButton
           label={secondaryAction.label}
           kind={secondaryAction.kind}
@@ -309,19 +318,35 @@ export function TodayScreen({ navigation }: Props) {
           title={inProgressRide.group.riderName + ' - ' + formatTime(inProgressRide.activeLeg.pickupTime)}
           today={today}
           todaysRides={todaysRides}
-          onNavigate={() => openNavigation(inProgressRide, state.preferences)}
+          primaryActionLabel="Trip Center"
+          primaryActionIcon="map-outline"
+          onNavigate={() =>
+            navigation.navigate('TripNavigation', {
+              tripId: inProgressRide.occurrence.id,
+              stopId: inProgressRide.activeLeg.id,
+            })
+          }
           secondaryAction={{
-            label: 'Completed',
+            label: 'External Nav',
             kind: 'secondary',
-            icon: 'checkmark-done-outline',
-            onPress: () =>
-              void runRideAction(
-                () => updateOccurrenceStatus(inProgressRide.occurrence.id, 'completed'),
-                'Ride completed',
-                'Complete ride failed',
-                inProgressRide.group.riderName + ' was marked completed.'
-              ),
+            icon: 'navigate-outline',
+            onPress: () => openNavigation(inProgressRide, state.preferences),
           }}
+          footerActions={
+            <ActionButton
+              label="Dropped Off"
+              kind="secondary"
+              icon="checkmark-done-outline"
+              onPress={() =>
+                void runRideAction(
+                  () => updateOccurrenceStatus(inProgressRide.occurrence.id, 'completed'),
+                  'Ride completed',
+                  'Complete ride failed',
+                  inProgressRide.group.riderName + ' was marked completed.'
+                )
+              }
+            />
+          }
         />
       ) : null}
 
@@ -347,7 +372,12 @@ export function TodayScreen({ navigation }: Props) {
                 () => updateOccurrenceStatus(nextRide.occurrence.id, 'in_progress'),
                 'Ride started',
                 'Start ride failed',
-                nextRide.group.riderName + ' is now in progress.'
+                nextRide.group.riderName + ' is now in progress.',
+                () =>
+                  navigation.navigate('TripNavigation', {
+                    tripId: nextRide.occurrence.id,
+                    stopId: nextRide.activeLeg.id,
+                  })
               ),
           }}
           footerActions={

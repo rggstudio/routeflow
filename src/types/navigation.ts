@@ -4,6 +4,7 @@ export type RootStackParamList = {
   Dashboard: undefined;
   AdminDashboard: undefined;
   RideDetail: { occurrenceId: string };
+  TripNavigation: { tripId: string; stopId?: string; riderId?: string };
   RideForm: { groupId?: string } | undefined;
   WeeklyReport: { weekStart: string };
   Home: undefined;
