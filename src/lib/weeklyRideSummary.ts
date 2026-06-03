@@ -11,8 +11,19 @@ export type WeeklyRideSummary = {
   rideCount: number;
 };
 
+type WeeklyRideSummaryDraft = {
+  key: string;
+  riderName: string;
+  serviceDate: string;
+  rides: RideOccurrenceView[];
+};
+
 function isCanceledStatus(status: RideStatus) {
   return status === 'canceled' || status === 'canceled_paid';
+}
+
+function isUnpaidCanceledStatus(status: RideStatus) {
+  return status === 'canceled';
 }
 
 function getSummaryStatus(statuses: RideStatus[]): RideStatus {
@@ -35,8 +46,14 @@ function getSummaryStatus(statuses: RideStatus[]): RideStatus {
   return 'scheduled';
 }
 
+function getSummarizedRides(rides: RideOccurrenceView[]) {
+  const activeRides = rides.filter((ride) => !isCanceledStatus(ride.occurrence.status));
+
+  return activeRides.length > 0 ? activeRides : rides;
+}
+
 export function summarizeWeeklyRides(rides: RideOccurrenceView[]): WeeklyRideSummary[] {
-  const summaries = new Map<string, WeeklyRideSummary>();
+  const summaries = new Map<string, WeeklyRideSummaryDraft>();
 
   for (const ride of rides) {
     const key =
@@ -50,28 +67,39 @@ export function summarizeWeeklyRides(rides: RideOccurrenceView[]): WeeklyRideSum
         key,
         riderName: ride.group.riderName,
         serviceDate: ride.occurrence.serviceDate,
-        status: ride.occurrence.status,
-        totalAmount: ride.occurrence.status === 'canceled' ? 0 : ride.effectivePay,
-        legTimes: [ride.activeLeg.pickupTime],
-        rideCount: 1,
+        rides: [ride],
       });
       continue;
     }
 
-    const nextTimes = [...current.legTimes, ride.activeLeg.pickupTime].sort(compareTime);
-    const statuses = [current.status, ride.occurrence.status];
-
     summaries.set(key, {
       ...current,
-      status: getSummaryStatus(statuses),
-      totalAmount:
-        current.totalAmount + (ride.occurrence.status === 'canceled' ? 0 : ride.effectivePay),
-      legTimes: nextTimes,
-      rideCount: current.rideCount + 1,
+      rides: [...current.rides, ride],
     });
   }
 
-  return [...summaries.values()].sort((a, b) => {
+  return [...summaries.values()].map((summary) => {
+    const summarizedRides = getSummarizedRides(summary.rides);
+    const legTimes = summarizedRides
+      .map((ride) => ride.activeLeg.pickupTime)
+      .sort(compareTime);
+    const statuses = summarizedRides.map((ride) => ride.occurrence.status);
+    const totalAmount = summary.rides.reduce(
+      (sum, ride) =>
+        sum + (isUnpaidCanceledStatus(ride.occurrence.status) ? 0 : ride.effectivePay),
+      0
+    );
+
+    return {
+      key: summary.key,
+      riderName: summary.riderName,
+      serviceDate: summary.serviceDate,
+      status: getSummaryStatus(statuses),
+      totalAmount,
+      legTimes,
+      rideCount: summarizedRides.length,
+    };
+  }).sort((a, b) => {
     if (a.serviceDate === b.serviceDate) {
       return compareTime(a.legTimes[0] ?? '00:00', b.legTimes[0] ?? '00:00');
     }
